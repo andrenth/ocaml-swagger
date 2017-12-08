@@ -1,0 +1,321 @@
+type json <ocaml module="Yojson.Safe"> = abstract
+
+type contact =
+  { ?name : string option
+  ; ?url <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?email <ocaml valid="Swagger_util.Validate.email"> : string option
+  }
+
+type license =
+  { name : string
+  ; ?url <ocaml valid="Swagger_util.Validate.url"> : string option
+  }
+
+type info =
+  { title : string
+  ; ?description : string option
+  ; ?terms_of_service <json name="termsOfService"> : string option
+  ; ?contact : contact option
+  ; ?license : license option
+  ; version : string
+  }
+
+type scheme =
+  [ Http  <json name="http">
+  | Https <json name="https">
+  | Ws    <json name="ws">
+  | Wss   <json name="wss">
+  ]
+
+type location =
+  [ Query    <json name="query">
+  | Header   <json name="header">
+  | Path     <json name="path">
+  | FormData <json name="formData">
+  | Body     <json name="body">
+  ]
+
+type kind =
+  [ String  <json name="string">
+  | Number  <json name="number">
+  | Integer <json name="integer">
+  | Boolean <json name="boolean">
+  | Array   <json name="array">
+  | File    <json name="file">
+  ]
+
+type collection_format =
+  [ Csv   <json name="csv">
+  | Ssv   <json name="ssv">
+  | Tsv   <json name="tsv">
+  | Pipes <json name="pipes">
+  | Multi <json name="multi">
+  ]
+
+type xml =
+  { ?name : string option
+  ; ?namespace <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?prefix : string option
+  ; ~attribute <ocaml default="false"> : bool
+  ; ~wrapped <ocaml default="false"> : bool
+  }
+
+type items_kind =
+  [ String  <json name="string">
+  | Number  <json name="number">
+  | Integer <json name="integer">
+  | Boolean <json name="boolean">
+  | Array   <json name="array">
+  ]
+
+type items =
+  { kind <json name="type"> : items_kind
+  ; ?format : string option
+  ; ?items : items option
+  ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
+  ; ?default : json option
+  ; ?maximum : int option
+  ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
+  ; ?minimum : int option
+  ; ?exclusive_minimum <json name="exclusiveMinimum"> : bool option
+  ; ?max_length <json name="maxLength"> : int option
+  ; ?min_length <json name="minLength"> : int option
+  ; ?pattern : string option
+  ; ?max_items <json name="maxItems"> : int option
+  ; ?min_items <json name="minItems"> : int option
+  ; ?unique_items <json name="uniqueItems"> : bool option
+  ; ?enum : json list option
+  ; ?multiple_of <json name="multipleOf"> : int option
+  }
+
+type external_documentation =
+  { ?description : string option
+  ; url <ocaml valid="Swagger_util.Validate.url"> : string
+  }
+
+type schema =
+  { ?ref <json name="$ref"> : reference option
+  ; ?format : string option
+  ; ?title : string option
+  ; ?description : string option
+  ; ?default : json option
+  ; ?multiple_of <json name="multipleOf"> : int option
+  ; ?maximum : int option
+  ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
+  ; ?minimum : int option
+  ; ?exclusive_minimum <json name="exclusiveMinimum"> : bool option
+  ; ?max_length <json name="maxLength"> : int option
+  ; ?min_length <json name="minLength"> : int option
+  ; ?pattern : string option
+  ; ?max_items <json name="maxItems"> : int option
+  ; ?min_items <json name="minItems"> : int option
+  ; ?unique_items <json name="uniqueItems"> : bool option
+  ; ?max_properties <json name="maxProperties"> : int option
+  ; ?min_properties <json name="minProperties"> : int option
+  ; ?required : string list option
+  ; ?enum : json list option
+  ; ?kind <json name="type"> : kind option
+  ; ?items : items option
+  ; ?all_of <json name="allOf"> : json option
+  ; ?properties : json option
+  ; ?additional_properties <json name="additionalProperties"> : json option
+  ; ?discriminator : string option
+  ; ~read_only <json name="readOnly"> <ocaml default="false"> : bool
+  ; ?xml : xml option
+  ; ?external_docs : external_documentation option
+  ; ?example : json option
+  }
+
+type parameter =
+  { name : string
+  ; location <json name="in"> : location
+  ; ?description : string option
+  ; ~required <ocaml default="false"> : bool
+  ; ?schema : schema option
+  ; ?kind <json name="type"> : kind option
+  ; ?format : string option
+  ; ~allow_empty_value <json name="allowEmptyValue"> <ocaml default="false"> : bool
+  ; ?items : items option
+  ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
+  ; ?default : json option
+  ; ?maximum : int option
+  ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
+  ; ?minimum : int option
+  ; ?exclusive_minimum <json name="exclusiveMinimum"> : bool option
+  ; ?max_length <json name="maxLength"> : int option
+  ; ?min_length <json name="minLength"> : int option
+  ; ?pattern : string option
+  ; ?max_items <json name="maxItems"> : int option
+  ; ?min_items <json name="minItems"> : int option
+  ; ?unique_items <json name="uniqueItems"> : bool option
+  ; ?enum : json list option
+  ; ?multiple_of <json name="multipleOf"> : int option
+  }
+
+type parameters_definitions = (string * parameter) list <json repr="object">
+
+type header =
+  { ?description : string option
+  ; kind <json name="type"> : kind
+  ; ?format : string option
+  ; ?items : items option
+  ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
+  ; ?default : json option
+  ; ?maximum : int option
+  ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
+  ; ?minimum : int option
+  ; ?exclusive_minimum <json name="exclusiveMinimum"> : bool option
+  ; ?max_length <json name="maxLength"> : int option
+  ; ?min_length <json name="minLength"> : int option
+  ; ?pattern : string option
+  ; ?max_items <json name="maxItems"> : int option
+  ; ?min_items <json name="minItems"> : int option
+  ; ?unique_items <json name="uniqueItems"> : bool option
+  ; ?enum : json list option
+  ; ?multiple_of <json name="multipleOf"> : int option
+  }
+
+type headers = (string * header) list <json repr="object">
+
+type example = (string * json) list <json repr="object">
+
+type response =
+  { description : string
+  ; ?schema : schema option
+  ; ?headers : headers option
+  ; ?examples : example option
+  }
+
+type responses_definitions = (string * response) list <json repr="object">
+
+type reference <ocaml valid="Swagger_util.Validate.url"> = string
+
+type parameter_or_reference =
+  { name : string
+  ; location <json name="in"> : location
+  ; ?description : string option
+  ; ~required <ocaml default="false"> : bool
+  ; ?schema : schema option
+  ; ?kind <json name="type"> : kind option
+  ; ?format : string option
+  ; ~allow_empty_value <json name="allowEmptyValue"> <ocaml default="false"> : bool
+  ; ?items : items option
+  ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
+  ; ?default : json option
+  ; ?maximum : int option
+  ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
+  ; ?minimum : int option
+  ; ?exclusive_minimum <json name="exclusiveMinimum"> : bool option
+  ; ?max_length <json name="maxLength"> : int option
+  ; ?min_length <json name="minLength"> : int option
+  ; ?pattern : string option
+  ; ?max_items <json name="maxItems"> : int option
+  ; ?min_items <json name="minItems"> : int option
+  ; ?unique_items <json name="uniqueItems"> : bool option
+  ; ?enum : json list option
+  ; ?multiple_of <json name="multipleOf"> : int option
+  ; ?ref <json name="$ref"> : reference option
+  }
+
+type response_or_reference =
+  { ?description : string option
+  ; ?schema : schema option
+  ; ?headers : headers option
+  ; ?examples : example option
+  ; ?ref <json name="$ref"> : reference option option
+  }
+
+type responses = (string * response_or_reference) list <json repr="object">
+
+type operation =
+  { ?tags : string list option
+  ; ?summary <ocaml valid="Swagger_util.Validate.length ~max:120"> : string option
+  ; ?description : string option
+  ; ?external_docs <json name="externalDocs"> : external_documentation option
+  ; ?operation_id <json name="operationId"> : string option
+  ; ?consumes : string list option (* validate mime? *)
+  ; ?produces : string list option (* validate mime? *)
+  ; ?parameters : parameter_or_reference list option
+  ; responses : responses
+  ; ?schemes : scheme list option
+  ; ~deprecated <ocaml default="false"> : bool
+  ; ?security : security_requirement list option
+  }
+
+type path_item =
+  { ?ref : string option (* validation? *)
+  ; ?get : operation option
+  ; ?put : operation option
+  ; ?post : operation option
+  ; ?delete : operation option
+  ; ?options : operation option
+  ; ?head : operation option
+  ; ?patch : operation option
+  ; ?parameters : parameter_or_reference list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
+  }
+
+type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">
+
+type security_scheme_type =
+  [ Basic  <json name="basic">
+  | ApiKey <json name="apiKey">
+  | OAuth2 <json name="oauth2">
+  ]
+
+type security_scheme_location =
+  [ Query  <json name="query">
+  | Header <json name="header">
+  ]
+
+type security_scheme_flow =
+  [ Implicit    <json name="implicit">
+  | Password    <json name="password">
+  | Application <json name="application">
+  | AccessCode  <json name="accessCode">
+  ]
+
+type scopes = (string * string) list <json repr="object">
+
+(* The Swagger 2.0 spec says all fields in the Security Scheme Object are required, except
+   "description". However, the Kubernetes spec includes neither flow, authorization, tokenUrl
+   nor scopes. *)
+type security_scheme =
+  { kind <json name="type"> : security_scheme_type
+  ; ?description : string option
+  ; name : string
+  ; location <json name="in"> : security_scheme_location
+  ; ?flow : security_scheme_flow option
+  ; ?authorization_url <json name="authorizationUrl"> <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?token_url <json name="tokenUrl"> <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?scopes : scopes option
+  }
+
+type security_definitions = (string * security_scheme) list <json repr="object">
+
+type security_requirement = (string * string list) list <json repr="object">
+
+type tag =
+  { name : string
+  ; ?description : string option
+  ; ?external_docs <json name="externalDocs"> : external_documentation option
+  }
+
+type definitions = (string * schema) list <json repr="object">
+
+type t =
+  { swagger <ocaml valid="Swagger_util.Validate.version"> : string
+  ; info : info
+  ; ?host <ocaml valid="Swagger_util.Validate.host"> : string option
+  ; ?base_path <json name="basePath"> <ocaml valid="Swagger_util.Validate.base_path"> : string option
+  ; ?schemes : scheme list option
+  ; ?consumes : string list option (* validate mime? *)
+  ; ?produces : string list option (* validate mime? *)
+  ; paths : paths
+  ; ?definitions : definitions option
+  ; ?parameters : parameters_definitions option
+  ; ?responses : responses_definitions option
+  ; ?security_definitions <json name="securityDefinitions"> : security_definitions option
+  ; ?security : security_requirement list option
+  ; ?tags : tag list option (* validate uniqueness *)
+  ; ?external_docs <json name="externalDocs"> : external_documentation option
+  }

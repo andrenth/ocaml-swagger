@@ -1,0 +1,16 @@
+(jbuild_version 1)
+
+(rule
+ ((targets (swagger_j.ml swagger_j.mli))
+  (deps    (swagger.atd))
+  (action  (run atdgen -j ${<}))))
+
+(rule
+ ((targets (swagger_t.ml swagger_t.mli))
+  (deps    (swagger.atd))
+  (action  (run atdgen -t ${<}))))
+
+(executable
+ ((name swagger)
+  (libraries (yojson atdgen))
+  (modules (swagger swagger_t swagger_j swagger_util))))
