@@ -302,7 +302,7 @@ type tag =
 
 type definitions = (string * schema) list <json repr="object">
 
-type t =
+type swagger =
   { swagger <ocaml valid="Swagger_util.Validate.version"> : string
   ; info : info
   ; ?host <ocaml valid="Swagger_util.Validate.host"> : string option

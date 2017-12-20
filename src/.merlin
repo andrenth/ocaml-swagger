@@ -1,0 +1,9 @@
+B ../_build/default/src
+FLG -w -40
+PKG atd
+PKG atdgen
+PKG biniou
+PKG easy-format
+PKG str
+PKG unix
+PKG yojson
