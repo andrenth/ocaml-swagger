@@ -93,6 +93,15 @@ type external_documentation =
   ; url <ocaml valid="Swagger_util.Validate.url"> : string
   }
 
+type schema_kind =
+  [ Boolean <json name="boolean">
+  | Object  <json name="object">
+  | Array   <json name="array">
+  | Number  <json name="number">
+  | String  <json name="string">
+  | Integer <json name="integer">
+  ]
+
 type schema =
   { ?ref <json name="$ref"> : reference option
   ; ?format : string option
@@ -114,11 +123,11 @@ type schema =
   ; ?min_properties <json name="minProperties"> : int option
   ; ?required : string list option
   ; ?enum : json list option
-  ; ?kind <json name="type"> : kind option
-  ; ?items : items option
+  ; ?kind <json name="type"> : schema_kind option
+  ; ?items : schema option
   ; ?all_of <json name="allOf"> : json option
-  ; ?properties : json option
-  ; ?additional_properties <json name="additionalProperties"> : json option
+  ; ?properties : (string * schema) list <json repr="object"> option
+  ; ?additional_properties <json name="additionalProperties"> : schema <json repr="object"> option
   ; ?discriminator : string option
   ; ~read_only <json name="readOnly"> <ocaml default="false"> : bool
   ; ?xml : xml option
