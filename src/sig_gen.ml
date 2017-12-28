@@ -284,7 +284,7 @@ let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.sch
   let properties = default [] schema.properties in
   let prefix p = if List.mem p required then "~" else "?" in
   let rec create_params = function
-    | [] -> ["t"] (* create returns t *)
+    | [] -> []
     | (name, schema)::ps ->
         let s =
           sprintf "%s%s:%s"
@@ -292,12 +292,13 @@ let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.sch
             (camelize name)
             (Schema.to_string ?parent_path ~reference_base schema) in
         s::create_params ps in
-  let create = Val.create "create" (create_params properties) "xxx_t" in
+  let create = Val.create "create" (create_params properties) "t" in
   let values =
     List.map
       (fun (name, schema) ->
         let opt = if List.mem name required then "" else " option" in
-        Val.create (camelize name) ["t"; sprintf "%s%s" (Schema.to_string ?parent_path ~reference_base schema) opt] "xxx_t")
+        let ret = sprintf "%s%s" (Schema.to_string ?parent_path ~reference_base schema) opt in
+        Val.create (camelize name) ["t"] ret)
       properties in
   Mod.create ~name ~types:[typ] ~values:(create::values) ()
 
