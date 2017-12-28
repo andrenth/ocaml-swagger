@@ -8,5 +8,6 @@ let () =
     Sig_gen.of_swagger
       ~path_base:"/api/"
       ~definition_base:"io.k8s."
+      ~reference_base:"#/definitions/io.k8s."
       swagger in
   printf "%s\n%!" (signature |> Sig_gen.to_string)

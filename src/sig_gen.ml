@@ -40,62 +40,6 @@ let rec item_kind_to_string (items : Swagger_j.items option) = function
       | Some is -> item_kind_to_string is.items is.kind ^ " list"
       | None -> failwith "item_kind_to_string: array type must have an 'items' field"
 
-module Schema = struct
-  type t = Swagger_j.schema
-
-  let rec kind_to_string (schema : t) =
-    match schema.ref with
-    | Some r -> "$ref" (* TODO *)
-    | None ->
-        match some schema.kind with
-        | `String  -> "string"
-        | `Number  -> "float"
-        | `Integer -> "int"
-        | `Boolean -> "bool"
-        | `Object  ->
-            let open Swagger_j in
-            (match schema.additional_properties with
-            | Some props -> sprintf "(string * %s) list" (kind_to_string props)
-            | None -> failwith "Schema.kind_to_string: object without additional_properties")
-        | `Array   ->
-            let open Swagger_j in
-            match schema.items with
-            | Some s -> kind_to_string s ^ " list"
-            | None -> failwith "Schema.kind_to_string: array type must have an 'items' field"
-
-  let to_string (schema : t) =
-    match schema.ref with
-    | Some r -> "$ref" (* TODO *)
-    | None -> kind_to_string schema
-end
-
-module Param = struct
-  type t = Swagger_j.parameter_or_reference
-
-  let rec kind_to_string (p : t) =
-    match some p.kind with
-    | `String  -> "string"
-    | `Number  -> "float"
-    | `Integer -> "int"
-    | `Boolean -> "bool"
-    | `File -> "file"
-    | `Array   ->
-        let open Swagger_j in
-        match p.items with
-        | Some items -> item_kind_to_string items.items items.kind ^ " array"
-        | None -> failwith "Param.kind_to_string: array type must have an 'items' field"
-
-  let to_string (p : t) =
-    let open Swagger_j in
-    let prefix = if p.required then "~" else "?" in
-    let name = camelize p.name in
-    let kind =
-      match p.location with
-      | `Body -> Schema.to_string (some p.schema)
-      | _     -> kind_to_string p in
-    sprintf "%s%s:%s" prefix name kind
-end
-
 module Type = struct
   type t =
     | Abstract of string
@@ -107,17 +51,17 @@ module Type = struct
 end
 
 module Val = struct
-  type t = string * string list
+  type t = string * string list * string
 
-  let create name typ = (name, typ)
+  let create name params ret = (name, params, ret)
 
-  let to_string ?(indent = 0) (name, typ) =
+  let to_string ?(indent = 0) (name, params, ret) =
     let pad = String.make indent ' ' in
-    let parms, ret =
-      match unsnoc typ with
-      | Some (parms, ret) -> (parms, "xxx_t") (* TODO return type *)
-      | None -> ["unit"], "unit" in
-    sprintf "%sval %s : %s -> %s\n" pad name (String.concat " -> " parms) ret
+    let params =
+      match params with
+      | [] -> ["unit"]
+      | _  -> params in
+    sprintf "%sval %s : %s -> %s\n" pad name (String.concat " -> " params) ret
 end
 
 module StringMap = Map.Make (struct
@@ -198,7 +142,11 @@ module Mod = struct
     let pad = String.make indent ' ' in
     let submods =
       StringMap.fold
-        (fun _ m s -> s ^ to_string ~indent:(indent + 2) m)
+        (fun name m acc ->
+          let s = to_string ~indent:(indent + 2) m in
+          (* Definitions first so that references work *)
+          if name = "Definitions" then s ^ acc
+          else acc ^ s)
         m.sub_modules
         "" in
     sprintf "%smodule %s : sig\n%s%s%send\n"
@@ -207,6 +155,89 @@ module Mod = struct
       submods
       (String.concat "" (List.map (Val.to_string ~indent:(indent + 2)) m.values))
       pad
+end
+
+let strip_base base path =
+  let plen = String.length path in
+  let blen = String.length base in
+  if plen >= blen then
+    if base = String.sub path 0 blen then
+      String.sub path blen (plen - blen)
+    else
+      path
+  else
+    path
+
+let split_ref ref =
+  ref
+  |> String.split_on_char '.'
+  |> List.filter ((<>)"")
+  |> List.map Mod.module_name
+
+let definition_type ?(parent_path = "") ~base ref =
+  let ref =
+    ref
+    |> String.lowercase_ascii
+    |> strip_base (String.lowercase_ascii base)
+    |> strip_base (String.lowercase_ascii parent_path)
+    |> split_ref
+    |> String.concat "." in
+  ref ^ ".t"
+
+module Schema = struct
+  type t = Swagger_j.schema
+
+  let rec kind_to_string ?parent_path ~reference_base (schema : t) =
+    match schema.ref with
+    | Some r -> definition_type ?parent_path ~base:reference_base r
+    | None ->
+        match some schema.kind with
+        | `String  -> "string"
+        | `Number  -> "float"
+        | `Integer -> "int"
+        | `Boolean -> "bool"
+        | `Object  ->
+            let open Swagger_j in
+            (match schema.additional_properties with
+            | Some props -> sprintf "(string * %s) list" (kind_to_string ~reference_base props)
+            | None -> failwith "Schema.kind_to_string: object without additional_properties")
+        | `Array   ->
+            let open Swagger_j in
+            match schema.items with
+            | Some s -> kind_to_string ~reference_base s ^ " list"
+            | None -> failwith "Schema.kind_to_string: array type must have an 'items' field"
+
+  let to_string ?parent_path ~reference_base (schema : t) =
+    match schema.ref with
+    | Some r -> definition_type ?parent_path ~base:reference_base r
+    | None -> kind_to_string ~reference_base schema
+end
+
+module Param = struct
+  type t = Swagger_j.parameter_or_reference
+
+  let rec kind_to_string (p : t) =
+    match some p.kind with
+    | `String  -> "string"
+    | `Number  -> "float"
+    | `Integer -> "int"
+    | `Boolean -> "bool"
+    | `File -> "file"
+    | `Array   ->
+        let open Swagger_j in
+        match p.items with
+        | Some items -> item_kind_to_string items.items items.kind ^ " array"
+        | None -> failwith "Param.kind_to_string: array type must have an 'items' field"
+
+  let to_string ~reference_base (p : t) =
+    let open Swagger_j in
+    let prefix = if p.required then "~" else "?" in
+    let name = camelize p.name in
+    let kind =
+      match p.location with
+      | `Body -> Schema.to_string ~reference_base (some p.schema)
+      | _     -> kind_to_string p in
+    sprintf "%s%s:%s" prefix name kind
 end
 
 let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
@@ -225,9 +256,10 @@ let operation_params = function
   | None, Some ps -> ps
   | Some ps, Some ps' -> merge_params ps ps'
 
-let operation_val name params = function
+let operation_val ~reference_base name params = function
   | Some (op : Swagger_j.operation) ->
-      Some (Val.create name (List.map Param.to_string (operation_params (params, op.parameters))))
+      let params = List.map (Param.to_string ~reference_base) (operation_params (params, op.parameters)) in
+      Some (Val.create name params "xxx_t")
   | None ->
       None
 
@@ -236,17 +268,17 @@ let rec keep_some = function
   | Some x :: xs -> x :: keep_some xs
   | None :: xs -> keep_some xs
 
-let path_item_vals (item : Swagger_j.path_item) : Val.t list =
-  let get     = operation_val "get"     item.parameters item.get in
-  let put     = operation_val "put"     item.parameters item.put in
-  let post    = operation_val "post"    item.parameters item.post in
-  let delete  = operation_val "delete"  item.parameters item.delete in
-  let options = operation_val "options" item.parameters item.options in
-  let head    = operation_val "head"    item.parameters item.head in
-  let patch   = operation_val "patch"   item.parameters item.patch in
+let path_item_vals ~reference_base (item : Swagger_j.path_item) : Val.t list =
+  let get     = operation_val ~reference_base "get"     item.parameters item.get in
+  let put     = operation_val ~reference_base "put"     item.parameters item.put in
+  let post    = operation_val ~reference_base "post"    item.parameters item.post in
+  let delete  = operation_val ~reference_base "delete"  item.parameters item.delete in
+  let options = operation_val ~reference_base "options" item.parameters item.options in
+  let head    = operation_val ~reference_base "head"    item.parameters item.head in
+  let patch   = operation_val ~reference_base "patch"   item.parameters item.patch in
   keep_some [get; put; post; delete; options; head; patch]
 
-let definition_module name (schema : Swagger_j.schema) : Mod.t =
+let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
   let typ = Type.abstract "t" in
   let required = default [] schema.required in
   let properties = default [] schema.properties in
@@ -258,30 +290,21 @@ let definition_module name (schema : Swagger_j.schema) : Mod.t =
           sprintf "%s%s:%s"
             (prefix name)
             (camelize name)
-            (Schema.to_string schema) in
+            (Schema.to_string ?parent_path ~reference_base schema) in
         s::create_params ps in
-  let create = Val.create "create" (create_params properties) in
+  let create = Val.create "create" (create_params properties) "xxx_t" in
   let values =
     List.map
       (fun (name, schema) ->
         let opt = if List.mem name required then "" else " option" in
-        Val.create (camelize name) ["t"; sprintf "%s%s" (Schema.to_string schema) opt])
+        Val.create (camelize name) ["t"; sprintf "%s%s" (Schema.to_string ?parent_path ~reference_base schema) opt] "xxx_t")
       properties in
   Mod.create ~name ~types:[typ] ~values:(create::values) ()
 
-let strip_base base path =
-  let plen = String.length path in
-  let blen = String.length base in
-  if plen >= blen then
-    if base = String.sub path 0 blen then
-      String.sub path blen (plen - blen)
-    else
-      path
-  else
-    path
-
 let rec insert_module m root = function
   | [] -> Mod.add_mod m root
+  | p::ps when Mod.name root = p ->
+      insert_module m root ps
   | p::ps ->
       match Mod.find_submodule p root with
       | Some subm ->
@@ -295,53 +318,58 @@ let remove_base base segments =
   | Some base, s::ss when base = s -> ss
   | _ -> segments
 
-let rec build_paths ~root ~base = function
+let rec build_paths ~root ~path_base ~reference_base = function
   | [] -> root
   | (path, item) :: paths ->
       let parents_and_child =
         path
-        |> strip_base base
+        |> strip_base path_base
         |> String.split_on_char '/'
         |> List.filter ((<>)"")
         |> List.map Mod.module_name
         |> unsnoc in
       match parents_and_child with
       | Some (parents, child) ->
-          let child_module = Mod.with_values child (path_item_vals item) in
+          let child_module = Mod.with_values child (path_item_vals ~reference_base item) in
           let root = insert_module child_module root parents in
-          build_paths ~root ~base paths
+          build_paths ~root ~path_base ~reference_base paths
       | None ->
-          let root = Mod.add_vals (path_item_vals item) root in
-          build_paths ~root ~base paths
+          let root = Mod.add_vals (path_item_vals ~reference_base item) root in
+          build_paths ~root ~path_base ~reference_base paths
 
-let rec build_definitions ~root ~base l =
+let rec build_definitions ~root ~definition_base ~reference_base l =
   match l with
   | [] -> root
   | (name, (schema : Swagger_j.schema)) :: defs when schema.ref = None ->
       let parents_and_child =
         name
-        |> strip_base base
-        |> String.split_on_char '.'
-        |> List.filter ((<>)"")
-        |> List.map Mod.module_name
+        |> strip_base definition_base
+        |> split_ref
         |> unsnoc in
       (match parents_and_child with
       | Some (parents, child) ->
-          let def = definition_module child schema in
+          let parent_path = (String.concat "." parents) ^ "." in
+          let def = definition_module ~reference_base ~parent_path ~name:child schema in
           let root = insert_module def root ("Definitions" :: parents) in
-          build_definitions ~root ~base defs
+          build_definitions ~root ~definition_base ~reference_base defs
       | None ->
-          let root = Mod.add_mod (definition_module name schema) root in
-          build_definitions ~root ~base defs)
-  (* XXX ignore schemas that are simply references? just use the referenced module? *)
+          let root = Mod.add_mod (definition_module ~reference_base ~name schema) root in
+          build_definitions ~root ~definition_base ~reference_base defs)
+  (* XXX ignore schemas that are simply references? just use the referenced module?
+   * in the kubernetes API this seems to be only for deprecated stuff. *)
   | (name, (schema : Swagger_j.schema)) :: defs ->
-      build_definitions ~root ~base defs
+      build_definitions ~root ~definition_base ~reference_base defs
 
-let of_swagger ?(path_base = "") ?(definition_base = "") s =
+let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "") s =
   let open Swagger_j in
   let definitions = default [] s.definitions in
-  let defs = build_definitions ~root:(Mod.empty "Definitions") ~base:definition_base definitions in
+  let defs =
+    build_definitions
+      ~root:(Mod.empty "Definitions")
+      ~definition_base
+      ~reference_base
+      definitions in
   let root = Mod.add_mod defs (Mod.empty s.info.title) in
-  build_paths ~root ~base:path_base s.paths
+  build_paths ~root ~path_base ~reference_base s.paths
 
 let to_string = Mod.to_string
