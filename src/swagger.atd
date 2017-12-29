@@ -231,7 +231,7 @@ type response_or_reference =
   ; ?schema : schema option
   ; ?headers : headers option
   ; ?examples : example option
-  ; ?ref <json name="$ref"> : reference option option
+  ; ?ref <json name="$ref"> : reference option
   }
 
 type responses = (string * response_or_reference) list <json repr="object">

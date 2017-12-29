@@ -256,10 +256,44 @@ let operation_params = function
   | None, Some ps -> ps
   | Some ps, Some ps' -> merge_params ps ps'
 
+let resp_type ~base (resp : Swagger_j.response_or_reference) =
+  let ref_type = definition_type ~base in
+  match resp.ref with
+  | Some r -> ref_type r
+  | None ->
+      match resp.schema with
+      | Some s -> "Definitions." ^ Schema.to_string ~reference_base:base s
+      | None -> "unit"
+
+let rec return_type ~base resps =
+  let is_error code =
+    let code = int_of_string code in
+    code < 200 || code >= 300 in
+  let responses_match (r1 : Swagger_j.response_or_reference) (r2 : Swagger_j.response_or_reference) =
+    match r1.schema, r2.schema with
+    | Some s1, Some s2 -> s1 = s2
+    | _ -> false in
+  match resps with
+  | [] ->
+      "unit" (* XXX error? *)
+  | (code, _)::rs when is_error code ->
+      return_type ~base rs (* ignore errors; assume strings *)
+  | (_code, resp)::rs ->
+      (* check all 2xx responses return the same type *)
+      let rec check first = function
+        | [] -> ()
+        | (code, _)::res when is_error code -> check first res
+        | (_code', resp')::rs when responses_match first resp' -> check first rs
+        | (c, (r:Swagger_j.response_or_reference))::_ -> failwith @@ sprintf "multiple response types are not supported: %s - %s" (Swagger_j.string_of_response_or_reference resp) (Swagger_j.string_of_response_or_reference r) in
+      check resp rs;
+      sprintf "(%s, string) result" (resp_type ~base resp)
+
 let operation_val ~reference_base name params = function
   | Some (op : Swagger_j.operation) ->
       let params = List.map (Param.to_string ~reference_base) (operation_params (params, op.parameters)) in
-      Some (Val.create name params "xxx_t")
+      (* TODO op.responses *)
+      let ret = return_type ~base:reference_base op.responses in
+      Some (Val.create name params ret)
   | None ->
       None
 
