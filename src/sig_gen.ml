@@ -85,7 +85,9 @@ module Mod = struct
     s
     |> String.lowercase_ascii
     |> String.capitalize_ascii
-    |> String.map (fun c -> if c = '-' || c = '.' then '_' else c)
+    |> String.map (fun c -> if c = '-' then '_' else c)
+    |> String.split_on_char '.'
+    |> List.hd
 
   let create ~name ?(types = []) ?(sub_modules = StringMap.empty) ?(values = []) () =
     { name
@@ -377,7 +379,6 @@ let rec build_paths ~root ~path_base ~reference_base = function
         |> strip_base path_base
         |> String.split_on_char '/'
         |> List.filter ((<>)"")
-        |> List.map Mod.module_name
         |> unsnoc in
       match parents_and_child with
       | Some (parents, child) ->
