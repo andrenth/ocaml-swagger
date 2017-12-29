@@ -73,7 +73,7 @@ module Mod = struct
   type t =
     { name : string
     ; types : Type.t list
-    ; sub_modules : t StringMap.t
+    ; submodules : t StringMap.t
     ; values : Val.t list
     }
 
@@ -89,41 +89,46 @@ module Mod = struct
     |> String.split_on_char '.'
     |> List.hd
 
-  let create ~name ?(types = []) ?(sub_modules = StringMap.empty) ?(values = []) () =
+  let create ~name ?(types = []) ?(submodules = StringMap.empty) ?(values = []) () =
     { name
     ; types
-    ; sub_modules
+    ; submodules
     ; values
     }
 
   let empty name =
     { name = module_name name
     ; types = []
-    ; sub_modules = StringMap.empty
+    ; submodules = StringMap.empty
     ; values = []
     }
 
   let with_types name types =
     { name = module_name name
     ; types = types
-    ; sub_modules = StringMap.empty
+    ; submodules = StringMap.empty
     ; values = []
     }
 
   let with_values name values =
     { name = module_name name
     ; types = []
-    ; sub_modules = StringMap.empty
+    ; submodules = StringMap.empty
     ; values
     }
 
   let name m = m.name
 
+  let submodules m =
+    m.submodules
+    |> StringMap.bindings
+    |> List.map snd
+
   let add_type t m =
     { m with types = t :: m.types }
 
   let add_mod subm m =
-    { m with sub_modules = StringMap.add subm.name subm m.sub_modules }
+    { m with submodules = StringMap.add subm.name subm m.submodules }
 
   let add_val v m =
     { m with values = v :: m.values }
@@ -135,13 +140,19 @@ module Mod = struct
     { m with values = m.values @ vs }
 
   let map_submodules f m =
-    { m with sub_modules = StringMap.map f m.sub_modules }
+    { m with submodules = StringMap.map f m.submodules }
 
   let has_submodules m =
-    StringMap.is_empty m.sub_modules
+    StringMap.is_empty m.submodules
 
   let find_submodule name m =
-    StringMap.find_opt name m.sub_modules
+    StringMap.find_opt name m.submodules
+
+  let iter f m =
+    f m;
+    StringMap.iter
+      (fun _name sub -> f sub)
+      m.submodules
 
   let rec to_string ?(indent = 0) m =
     let pad = String.make indent ' ' in
@@ -149,10 +160,10 @@ module Mod = struct
       StringMap.fold
         (fun name m acc ->
           let s = to_string ~indent:(indent + 2) m in
-          (* Definitions first so that references work *)
+          (* Definitions first to simplify references *)
           if name = "Definitions" then s ^ acc
           else acc ^ s)
-        m.sub_modules
+        m.submodules
         "" in
     sprintf "%smodule %s : sig\n%s%s%send\n"
       pad
