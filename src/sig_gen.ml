@@ -402,7 +402,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
       | Some (parents, child) ->
           let parent_path = (String.concat "." parents) ^ "." in
           let def = definition_module ~reference_base ~parent_path ~name:child schema in
-          let root = insert_module def root ("Definitions" :: parents) in
+          let root = insert_module def root parents in
           build_definitions ~root ~definition_base ~reference_base defs
       | None ->
           let root = Mod.add_mod (definition_module ~reference_base ~name schema) root in
