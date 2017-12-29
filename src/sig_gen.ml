@@ -82,7 +82,10 @@ module Mod = struct
       let last = String.length s - 1 in
       if s.[0] = '{' && s.[last] = '}' then "By_" ^ String.sub s 1 (last - 1)
       else s in
-    s |> String.lowercase_ascii |> String.capitalize_ascii
+    s
+    |> String.lowercase_ascii
+    |> String.capitalize_ascii
+    |> String.map (fun c -> if c = '-' || c = '.' then '_' else c)
 
   let create ~name ?(types = []) ?(sub_modules = StringMap.empty) ?(values = []) () =
     { name
@@ -229,15 +232,28 @@ module Param = struct
         | Some items -> item_kind_to_string items.items items.kind ^ " array"
         | None -> failwith "Param.kind_to_string: array type must have an 'items' field"
 
+  let is_keyword = function
+    | "object"
+    | "to"
+    | "type" -> true
+    | _ -> false
+
+  let name n =
+    let n =
+      if n.[0] = '$' then String.sub n 1 (String.length n - 1)
+      else n in
+    let n = camelize n in
+    if is_keyword n then n ^ "_"
+    else n
+
   let to_string ~reference_base (p : t) =
     let open Swagger_j in
-    let prefix = if p.required then "~" else "?" in
-    let name = camelize p.name in
+    let prefix = if p.required then "" else "?" in
     let kind =
       match p.location with
       | `Body -> Schema.to_string ~reference_base (some p.schema)
       | _     -> kind_to_string p in
-    sprintf "%s%s:%s" prefix name kind
+    sprintf "%s%s:%s" prefix (name p.name) kind
 end
 
 let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
@@ -316,14 +332,14 @@ let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.sch
   let typ = Type.abstract "t" in
   let required = default [] schema.required in
   let properties = default [] schema.properties in
-  let prefix p = if List.mem p required then "~" else "?" in
+  let prefix p = if List.mem p required then "" else "?" in
   let rec create_params = function
     | [] -> []
     | (name, schema)::ps ->
         let s =
           sprintf "%s%s:%s"
             (prefix name)
-            (camelize name)
+            (Param.name name)
             (Schema.to_string ?parent_path ~reference_base schema) in
         s::create_params ps in
   let create = Val.create "create" (create_params properties) "t" in
@@ -332,7 +348,7 @@ let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.sch
       (fun (name, schema) ->
         let opt = if List.mem name required then "" else " option" in
         let ret = sprintf "%s%s" (Schema.to_string ?parent_path ~reference_base schema) opt in
-        Val.create (camelize name) ["t"] ret)
+        Val.create (Param.name name) ["t"] ret)
       properties in
   Mod.create ~name ~types:[typ] ~values:(create::values) ()
 
