@@ -202,18 +202,18 @@ module Schema = struct
         | `Object  ->
             let open Swagger_j in
             (match schema.additional_properties with
-            | Some props -> sprintf "(string * %s) list" (kind_to_string ~reference_base props)
+            | Some props -> sprintf "(string * %s) list" (kind_to_string ?parent_path ~reference_base props)
             | None -> failwith "Schema.kind_to_string: object without additional_properties")
         | `Array   ->
             let open Swagger_j in
             match schema.items with
-            | Some s -> kind_to_string ~reference_base s ^ " list"
+            | Some s -> kind_to_string ?parent_path ~reference_base s ^ " list"
             | None -> failwith "Schema.kind_to_string: array type must have an 'items' field"
 
   let to_string ?parent_path ~reference_base (schema : t) =
     match schema.ref with
     | Some r -> definition_type ?parent_path ~base:reference_base r
-    | None -> kind_to_string ~reference_base schema
+    | None -> kind_to_string ?parent_path ~reference_base schema
 end
 
 module Param = struct
