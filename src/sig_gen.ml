@@ -95,6 +95,7 @@ module Mod = struct
     ; submodules : t StringMap.t
     ; values : Val.t list
     ; deps : StringSet.t
+    ; module_rec_trick : bool
     }
 
   let module_name s =
@@ -109,20 +110,21 @@ module Mod = struct
     |> String.split_on_char '.'
     |> List.hd
 
-  let create ~name ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) ?(deps = StringSet.empty) () =
+  let create ~name ?(module_rec_trick = false) ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) ?(deps = StringSet.empty) () =
     { name = module_name name
     ; path = List.map module_name path
     ; types
     ; submodules
     ; values
     ; deps
+    ; module_rec_trick
     }
 
-  let empty name ?(path = []) () =
-    create ~name ~path ()
+  let empty name ?(module_rec_trick = false) ?(path = []) () =
+    create ~name ~module_rec_trick ~path ()
 
-  let with_values name ?(path = []) values =
-    create ~name ~path ~values ()
+  let with_values name ?(module_rec_trick = false) ?(path = []) values =
+    create ~name ~module_rec_trick ~path ~values ()
 
   let name m = m.name
 
@@ -189,8 +191,7 @@ module Mod = struct
       (fun (_, m1) (_, m2) ->
         let d1 = depends_on m1 m2 in
         let d2 = depends_on m2 m1 in
-        if d1 && d2 then
-          (printf "cycle detected: %s <-> %s" m1.name m2.name; 0)
+        if d1 && d2 then 0
         else if d1 then -1
         else if d2 then 1
         else 0)
@@ -208,13 +209,15 @@ module Mod = struct
              if name = "Definitions" then s ^ acc
              else acc ^ s)
            "" in
-    sprintf "%smodule %s : sig\n%s%s%s%send\n"
+    sprintf "%smodule%s%s : sig\n%s%s%s%send%s\n"
       pad
+      (if m.module_rec_trick then " rec " else " ")
       m.name
       submods
       (String.concat "\n" (List.map (Type.to_string ~indent:(indent + 2)) m.types))
       (String.concat "" (List.map (Val.to_string ~indent:(indent + 2)) m.values))
       pad
+      (if m.module_rec_trick then " = " ^ m.name else "")
 end
 
 let split_ref ref =
@@ -223,49 +226,47 @@ let split_ref ref =
   |> List.filter ((<>)"")
   |> List.map Mod.module_name
 
-let reference_module_path ?(parent_path = "") ~base ref =
-  ref
-  |> String.lowercase_ascii
-  |> strip_base (String.lowercase_ascii base)
-  |> strip_base (String.lowercase_ascii parent_path)
-  |> split_ref
+let reference_module_path ~root ~base ref =
+  let path =
+    ref
+    |> String.lowercase_ascii
+    |> strip_base (String.lowercase_ascii base)
+    |> split_ref in
+  Mod.qualified_name root :: path
 
-let reference_module ?parent_path ~base ref =
-  reference_module_path ?parent_path ~base ref
+let reference_module ~root ~base ref =
+  reference_module_path ~root ~base ref
   |> String.concat "."
 
-let reference_type ?parent_path ~base ref =
-  reference_module ?parent_path ~base ref ^ ".t"
+let reference_type ~root ~base ref =
+  reference_module ~root ~base ref ^ ".t"
 
 module Schema = struct
   type t =
     { raw            : Swagger_j.schema
-    ; parent_path    : string option
     ; reference_base : string
     }
 
-  let create ?parent_path ~reference_base raw =
-    { raw; parent_path; reference_base }
+  let create ~reference_base raw =
+    { raw; reference_base }
 
-  let rec depends t =
+  let rec depends ~root t =
     let base = t.reference_base in
-    let parent_path = t.parent_path in
     match t.raw.ref with
-    | Some r -> Some (reference_module ?parent_path ~base r)
+    | Some r -> Some (reference_module ~root ~base r)
     | None ->
         match some t.raw.kind with
         | `Array ->
             let open Swagger_j in
             (match t.raw.items with
-            | Some s -> depends (create ~reference_base:base s)
+            | Some s -> depends ~root (create ~reference_base:base s)
             | None -> failwith "Schema.depends: array type must have an 'items' field")
         | _ -> None
 
-  let rec kind_to_string t =
-    let parent_path = t.parent_path in
+  let rec kind_to_string ~root t =
     let reference_base = t.reference_base in
     match t.raw.ref with
-    | Some r -> reference_type ?parent_path ~base:reference_base r
+    | Some r -> reference_type ~root ~base:reference_base r
     | None ->
         match some t.raw.kind with
         | `String  -> "string"
@@ -275,19 +276,18 @@ module Schema = struct
         | `Object  ->
             let open Swagger_j in
             (match t.raw.additional_properties with
-            | Some props -> sprintf "(string * %s) list" (kind_to_string (create ?parent_path ~reference_base props))
+            | Some props -> sprintf "(string * %s) list" (kind_to_string ~root (create ~reference_base props))
             | None -> failwith "Schema.kind_to_string: object without additional_properties")
         | `Array   ->
             let open Swagger_j in
             match t.raw.items with
-            | Some s -> kind_to_string (create ?parent_path ~reference_base s) ^ " list"
+            | Some s -> kind_to_string ~root (create ~reference_base s) ^ " list"
             | None -> failwith "Schema.kind_to_string: array type must have an 'items' field"
 
   let to_string t =
-    let parent_path = t.parent_path in
     let reference_base = t.reference_base in
     match t.raw.ref with
-    | Some r -> reference_type ?parent_path ~base:reference_base r
+    | Some r -> reference_type ~base:reference_base r
     | None -> kind_to_string t
 end
 
@@ -321,12 +321,12 @@ module Param = struct
     if is_keyword n then n ^ "_"
     else n
 
-  let to_string ~reference_base (p : t) =
+  let to_string ~root ~reference_base (p : t) =
     let open Swagger_j in
     let prefix = if p.required then "" else "?" in
     let kind =
       match p.location with
-      | `Body -> Schema.to_string (Schema.create ~reference_base (some p.schema))
+      | `Body -> Schema.to_string ~root (Schema.create ~reference_base (some p.schema))
       | _     -> kind_to_string p in
     sprintf "%s%s:%s" prefix (name p.name) kind
 end
@@ -347,16 +347,16 @@ let operation_params = function
   | None, Some ps -> ps
   | Some ps, Some ps' -> merge_params ps ps'
 
-let resp_type ~base (resp : Swagger_j.response_or_reference) =
-  let ref_type = reference_type ~base in
+let resp_type ~root ~base (resp : Swagger_j.response_or_reference) =
+  let ref_type = reference_type ~root ~base in
   match resp.ref with
   | Some r -> ref_type r
   | None ->
       match resp.schema with
-      | Some s -> "Definitions." ^ Schema.to_string (Schema.create ~reference_base:base s)
+      | Some s -> Schema.to_string ~root (Schema.create ~reference_base:base s)
       | None -> "unit"
 
-let rec return_type ~base resps =
+let rec return_type ~root ~base resps =
   let is_error code =
     let code = int_of_string code in
     code < 200 || code >= 300 in
@@ -368,7 +368,7 @@ let rec return_type ~base resps =
   | [] ->
       "unit" (* XXX error? *)
   | (code, _)::rs when is_error code ->
-      return_type ~base rs (* ignore errors; assume strings *)
+      return_type ~root ~base rs (* ignore errors; assume strings *)
   | (_code, resp)::rs ->
       (* check all 2xx responses return the same type *)
       let rec check first = function
@@ -377,13 +377,13 @@ let rec return_type ~base resps =
         | (_code', resp')::rs when responses_match first resp' -> check first rs
         | (c, (r:Swagger_j.response_or_reference))::_ -> failwith @@ sprintf "multiple response types are not supported: %s - %s" (Swagger_j.string_of_response_or_reference resp) (Swagger_j.string_of_response_or_reference r) in
       check resp rs;
-      sprintf "(%s, string) result" (resp_type ~base resp)
+      sprintf "(%s, string) result" (resp_type ~root ~base resp)
 
-let operation_val ~reference_base name params = function
+let operation_val ~root ~reference_base name params = function
   | Some (op : Swagger_j.operation) ->
-      let params = List.map (Param.to_string ~reference_base) (operation_params (params, op.parameters)) in
+      let params = List.map (Param.to_string ~root ~reference_base) (operation_params (params, op.parameters)) in
       (* TODO op.responses *)
-      let ret = return_type ~base:reference_base op.responses in
+      let ret = return_type ~root ~base:reference_base op.responses in
       Some (Val.create name params ret)
   | None ->
       None
@@ -393,17 +393,17 @@ let rec keep_some = function
   | Some x :: xs -> x :: keep_some xs
   | None :: xs -> keep_some xs
 
-let path_item_vals ~reference_base (item : Swagger_j.path_item) : Val.t list =
-  let get     = operation_val ~reference_base "get"     item.parameters item.get in
-  let put     = operation_val ~reference_base "put"     item.parameters item.put in
-  let post    = operation_val ~reference_base "post"    item.parameters item.post in
-  let delete  = operation_val ~reference_base "delete"  item.parameters item.delete in
-  let options = operation_val ~reference_base "options" item.parameters item.options in
-  let head    = operation_val ~reference_base "head"    item.parameters item.head in
-  let patch   = operation_val ~reference_base "patch"   item.parameters item.patch in
+let path_item_vals ~root ~reference_base (item : Swagger_j.path_item) : Val.t list =
+  let get     = operation_val ~root ~reference_base "get"     item.parameters item.get in
+  let put     = operation_val ~root ~reference_base "put"     item.parameters item.put in
+  let post    = operation_val ~root ~reference_base "post"    item.parameters item.post in
+  let delete  = operation_val ~root ~reference_base "delete"  item.parameters item.delete in
+  let options = operation_val ~root ~reference_base "options" item.parameters item.options in
+  let head    = operation_val ~root ~reference_base "head"    item.parameters item.head in
+  let patch   = operation_val ~root ~reference_base "patch"   item.parameters item.patch in
   keep_some [get; put; post; delete; options; head; patch]
 
-let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
+let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
   let typ = Type.abstract "t" in
   let required = default [] schema.required in
   let properties = default [] schema.properties in
@@ -416,13 +416,13 @@ let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.sch
   let create_params =
     List.fold_left
       (fun (params, deps) (name, schema) ->
-        let s = Schema.create ?parent_path ~reference_base schema in
+        let s = Schema.create ~reference_base schema in
         let p =
           sprintf "%s%s:%s"
             (prefix name)
             (Param.name name)
-            (Schema.to_string s) in
-        let deps = update_deps deps (Schema.depends s) in
+            (Schema.to_string ~root s) in
+        let deps = update_deps deps (Schema.depends ~root s) in
         p::params, deps)
       ([], StringSet.empty) in
 
@@ -433,15 +433,16 @@ let definition_module ?parent_path ~reference_base ~name (schema : Swagger_j.sch
     List.fold_left
       (fun (values, deps) (name, schema) ->
         let opt = if List.mem name required then "" else " option" in
-        let s = Schema.create ?parent_path ~reference_base schema in
-        let ret = sprintf "%s%s" (Schema.to_string s) opt in
-        let deps = update_deps deps (Schema.depends s) in
+        let s = Schema.create ~reference_base schema in
+        let ret = sprintf "%s%s" (Schema.to_string ~root s) opt in
+        let deps = update_deps deps (Schema.depends ~root s) in
         let value = Val.create (Param.name name) ["t"] ret in
         (value :: values, deps))
       ([], deps)
       properties in
 
   let values = create :: List.rev values in
+
   let path =
     match parent_path with
     | Some p -> String.split_on_char '.' p
@@ -478,11 +479,11 @@ let rec build_paths ~root ~path_base ~reference_base = function
         |> unsnoc in
       match parents_and_child with
       | Some (parents, child) ->
-          let child_module = Mod.with_values child (path_item_vals ~reference_base item) in
+          let child_module = Mod.with_values child (path_item_vals ~root ~reference_base item) in
           let root = insert_module child_module root parents in
           build_paths ~root ~path_base ~reference_base paths
       | None ->
-          let root = Mod.add_vals (path_item_vals ~reference_base item) root in
+          let root = Mod.add_vals (path_item_vals ~root ~reference_base item) root in
           build_paths ~root ~path_base ~reference_base paths
 
 let rec build_definitions ~root ~definition_base ~reference_base l =
@@ -497,11 +498,11 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
       (match parents_and_child with
       | Some (parents, child) ->
           let parent_path = (String.concat "." parents) in
-          let def = definition_module ~reference_base ~parent_path ~name:child schema in
+          let def = definition_module ~root ~reference_base ~parent_path ~name:child schema in
           let root = insert_module def root parents in
           build_definitions ~root ~definition_base ~reference_base defs
       | None ->
-          let root = Mod.add_mod (definition_module ~reference_base ~name schema) root in
+          let root = Mod.add_mod (definition_module ~root ~reference_base ~name schema) root in
           build_definitions ~root ~definition_base ~reference_base defs)
   (* XXX ignore schemas that are simply references? just use the referenced module?
    * in the kubernetes API this seems to be only for deprecated stuff. *)
@@ -518,7 +519,7 @@ let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "") 
       ~definition_base
       ~reference_base
       definitions in
-  let root = Mod.add_mod defs (Mod.empty title ()) in
-  build_paths ~root ~path_base ~reference_base s.paths
+  let defs = build_paths ~root:defs ~path_base ~reference_base s.paths in
+  Mod.add_mod defs (Mod.empty ~module_rec_trick:true title ())
 
 let to_string = Mod.to_string
