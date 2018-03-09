@@ -12,5 +12,5 @@
 
 (executable
  ((name swagger)
-  (libraries (yojson atdgen))
-  (modules (Sig_gen swagger swagger_t swagger_j swagger_util))))
+  (public_name swagger)
+  (libraries (yojson atdgen))))

@@ -41,29 +41,87 @@ let rec item_kind_to_string (items : Swagger_j.items option) = function
       | None -> failwith "item_kind_to_string: array type must have an 'items' field"
 
 module Type = struct
+  module Sig = struct
+    type t =
+      | Abstract of string
+
+    let abstract name = Abstract name
+
+    let to_string ?(indent = 0) t =
+      let pad = String.make indent ' ' in
+      match t with
+      | Abstract name -> sprintf "%stype %s\n" pad name
+  end
+
+  module Impl = struct
+    type t =
+      | Alias of string * string
+      | Record of string * (string * string) list
+      | Phantom of string
+
+    let alias name target = Alias (name, target)
+    let record name fields = Record (name, fields)
+    let phantom name = Phantom name
+
+    let to_string ?(indent = 0) t =
+      let pad = String.make indent ' ' in
+      match t with
+      | Phantom name -> sprintf "%stype %s\n" pad name
+      | Alias (name, target) -> sprintf "%stype %s = %s\n" pad name target
+      | Record (name, fields) ->
+          let s =
+            List.fold_left
+              (fun acc (fld, typ) -> acc ^ sprintf " %s : %s;" fld typ)
+              ""
+              fields in
+          sprintf "%stype %s = { %s }\n" pad name s
+  end
+
   type t =
-    | Abstract of string
+    { signature : Sig.t
+    ; implementation : Impl.t
+    }
 
-  let abstract name = Abstract name
-
-  let to_string ?(indent = 0) t =
-    let pad = String.make indent ' ' in
-    match t with
-    | Abstract name -> sprintf "%stype %s\n" pad name
+  let create signature implementation = { signature; implementation }
 end
 
 module Val = struct
-  type t = string * string list * string
+  module Sig = struct
+    type t = string * string list * string
 
-  let create name params ret = (name, params, ret)
+    let create name params ret = (name, params, ret)
 
-  let to_string ?(indent = 0) (name, params, ret) =
-    let pad = String.make indent ' ' in
-    let params =
-      match params with
-      | [] -> ["unit"]
-      | _  -> params in
-    sprintf "%sval %s : %s -> %s\n" pad name (String.concat " -> " params) ret
+    let to_string ?(indent = 0) (name, params, ret) =
+      let pad = String.make indent ' ' in
+      let params =
+        match params with
+        | [] -> ["unit"]
+        | _  -> params in
+      sprintf "%sval %s : %s -> %s\n" pad name (String.concat " -> " params) ret
+  end
+
+  module Impl = struct
+    type body = Get | Put | Delete
+    type t = string * string list * body
+
+    let create name params body = (name, params, body)
+
+    let to_string ?(indent = 0) (name, params, body) =
+      let pad = String.make indent ' ' in
+      sprintf "%slet %s %s =\n%s%s\n"
+        pad
+        name
+        (String.concat " " params)
+        (String.make (indent + 2) ' ')
+        "assert false"
+  end
+
+  type t =
+    { signature : Sig.t
+    ; implementation : Impl.t
+    }
+
+  let create signature implementation = { signature; implementation }
 end
 
 module StringMap = Map.Make (struct
@@ -92,10 +150,10 @@ module Mod = struct
     { name : string
     ; path : string list
     ; types : Type.t list
-    ; submodules : t StringMap.t
     ; values : Val.t list
+    ; submodules : t StringMap.t
     ; deps : StringSet.t
-    ; module_rec_trick : bool
+    ; recursive : bool
     }
 
   let module_name s =
@@ -110,21 +168,21 @@ module Mod = struct
     |> String.split_on_char '.'
     |> List.hd
 
-  let create ~name ?(module_rec_trick = false) ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) ?(deps = StringSet.empty) () =
+  let create ~name ?(recursive = false) ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) ?(deps = StringSet.empty) () =
     { name = module_name name
     ; path = List.map module_name path
     ; types
-    ; submodules
     ; values
+    ; submodules
     ; deps
-    ; module_rec_trick
+    ; recursive
     }
 
-  let empty name ?(module_rec_trick = false) ?(path = []) () =
-    create ~name ~module_rec_trick ~path ()
+  let empty name ?(recursive = false) ?(path = []) () =
+    create ~name ~recursive ~path ()
 
-  let with_values name ?(module_rec_trick = false) ?(path = []) values =
-    create ~name ~module_rec_trick ~path ~values ()
+  let with_values name ?(recursive = false) ?(path = []) values =
+    create ~name ~recursive ~path ~values ()
 
   let name m = m.name
 
@@ -136,9 +194,6 @@ module Mod = struct
   let add_type t m =
     { m with types = t :: m.types }
 
-  let add_mod subm m =
-    { m with submodules = StringMap.add subm.name subm m.submodules }
-
   let add_val v m =
     { m with values = v :: m.values }
 
@@ -147,6 +202,9 @@ module Mod = struct
 
   let add_vals vs m =
     { m with values = m.values @ vs }
+
+  let add_mod subm m =
+    { m with submodules = StringMap.add subm.name subm m.submodules }
 
   let map_submodules f m =
     { m with submodules = StringMap.map f m.submodules }
@@ -196,7 +254,7 @@ module Mod = struct
         else if d2 then 1
         else 0)
 
-  let rec to_string ?(indent = 0) m =
+  let rec sig_to_string ?(indent = 0) m =
     let pad = String.make indent ' ' in
     let submods =
       m.submodules
@@ -204,20 +262,49 @@ module Mod = struct
       |> sort_by_deps
       |> List.fold_left
            (fun acc (name, m) ->
-             let s = to_string ~indent:(indent + 2) m in
+             let s = sig_to_string ~indent:(indent + 2) m in
              (* Definitions first to simplify references *)
              if name = "Definitions" then s ^ acc
              else acc ^ s)
            "" in
-    sprintf "%smodule%s%s : sig\n%s%s%s%send%s\n"
+    sprintf "%smodule%s%s : sig\n%s%s%s%send\n"
       pad
-      (if m.module_rec_trick then " rec " else " ")
+      (if m.recursive then " rec " else " ")
       m.name
       submods
-      (String.concat "\n" (List.map (Type.to_string ~indent:(indent + 2)) m.types))
-      (String.concat "" (List.map (Val.to_string ~indent:(indent + 2)) m.values))
+      (String.concat "\n" (List.map (fun t -> Type.Sig.to_string ~indent:(indent + 2) t.Type.signature) m.types))
+      (String.concat "" (List.map (fun v -> Val.Sig.to_string ~indent:(indent + 2) v.Val.signature) m.values))
       pad
-      (if m.module_rec_trick then " = " ^ m.name else "")
+
+  let rec impl_to_string ?(indent = 0) m =
+    let pad = String.make indent ' ' in
+    let submods =
+      m.submodules
+      |> StringMap.bindings
+      |> sort_by_deps
+      |> List.fold_left
+           (fun acc (name, m) ->
+             let s = impl_to_string ~indent:(indent + 2) m in
+             (* Definitions first to simplify references *)
+             if name = "Definitions" then s ^ acc
+             else acc ^ s)
+           "" in
+    let decl =
+      if m.recursive
+      then ""
+      else sprintf "%smodule %s " pad m.name in
+
+    sprintf "%s= struct\n%s%s%s%send\n"
+      decl
+      submods
+      (String.concat "\n" (List.map (fun t -> Type.Impl.to_string ~indent:(indent + 2) t.Type.implementation) m.types))
+      (String.concat "" (List.map (fun v -> Val.Impl.to_string ~indent:(indent + 2) v.Val.implementation) m.values))
+      pad
+
+  let to_string ?indent m =
+    sprintf "%s %s"
+      (sig_to_string ?indent m)
+      (impl_to_string ?indent m)
 end
 
 let split_ref ref =
@@ -321,14 +408,21 @@ module Param = struct
     if is_keyword n then n ^ "_"
     else n
 
+  let prefixes required =
+    if required
+    then ("", "~")
+    else ("?", "?")
+
   let to_string ~root ~reference_base (p : t) =
     let open Swagger_j in
-    let prefix = if p.required then "" else "?" in
+    let sig_prefix, impl_prefix = prefixes p.required in
     let kind =
       match p.location with
       | `Body -> Schema.to_string ~root (Schema.create ~reference_base (some p.schema))
       | _     -> kind_to_string p in
-    sprintf "%s%s:%s" prefix (name p.name) kind
+    let sig_str = sprintf "%s%s:%s" sig_prefix (name p.name) kind in
+    let impl_str = sprintf "%s%s" impl_prefix (name p.name) in
+    (sig_str, impl_str)
 end
 
 let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
@@ -381,10 +475,15 @@ let rec return_type ~root ~base resps =
 
 let operation_val ~root ~reference_base name params = function
   | Some (op : Swagger_j.operation) ->
-      let params = List.map (Param.to_string ~root ~reference_base) (operation_params (params, op.parameters)) in
+      let sig_params, impl_params =
+        operation_params (params, op.parameters)
+        |> List.map (Param.to_string ~root ~reference_base)
+        |> List.split in
       (* TODO op.responses *)
       let ret = return_type ~root ~base:reference_base op.responses in
-      Some (Val.create name params ret)
+      let signature = Val.Sig.create name sig_params ret in
+      let implementation = Val.Impl.create name impl_params Val.Impl.Get in
+      Some (Val.create signature implementation)
   | None ->
       None
 
@@ -404,10 +503,8 @@ let path_item_vals ~root ~reference_base (item : Swagger_j.path_item) : Val.t li
   keep_some [get; put; post; delete; options; head; patch]
 
 let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
-  let typ = Type.abstract "t" in
   let required = default [] schema.required in
   let properties = default [] schema.properties in
-  let prefix p = if List.mem p required then "" else "?" in
 
   let update_deps deps = function
     | Some d -> StringSet.add d deps
@@ -416,38 +513,70 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
   let create_params =
     List.fold_left
       (fun (params, deps) (name, schema) ->
+        let param_name = Param.name name in
+        let sig_prefix, impl_prefix = Param.prefixes (List.mem name required) in
         let s = Schema.create ~reference_base schema in
-        let p =
-          sprintf "%s%s:%s"
-            (prefix name)
-            (Param.name name)
-            (Schema.to_string ~root s) in
+        let schema_str = Schema.to_string ~root s in
+        let sig_param = sprintf "%s%s:%s" sig_prefix param_name schema_str in
+        let impl_param = sprintf "%s%s" impl_prefix param_name in
         let deps = update_deps deps (Schema.depends ~root s) in
-        p::params, deps)
+        (sig_param, impl_param)::params, deps)
       ([], StringSet.empty) in
 
-  let params, deps = create_params properties in
-  let create = Val.create "create" (List.rev params) "t" in
+  let alias_type () =
+    let tgt = Schema.kind_to_string ~root (Schema.create ~reference_base schema) in
+    let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.alias "t" tgt) in
+    let create =
+      Val.create
+        (Val.Sig.create "create" [tgt] "t")
+        (Val.Impl.create "create" ["x"] Val.Impl.Get) in
+    [typ], [create], StringSet.empty in
 
-  let values, deps =
-    List.fold_left
-      (fun (values, deps) (name, schema) ->
-        let opt = if List.mem name required then "" else " option" in
-        let s = Schema.create ~reference_base schema in
-        let ret = sprintf "%s%s" (Schema.to_string ~root s) opt in
-        let deps = update_deps deps (Schema.depends ~root s) in
-        let value = Val.create (Param.name name) ["t"] ret in
-        (value :: values, deps))
-      ([], deps)
-      properties in
+  let record_type () =
+    let params, deps = create_params properties in
+    let sig_params, impl_params = params |> List.rev |> List.split in
+    let create =
+      Val.create
+        (Val.Sig.create "create" sig_params "t")
+        (Val.Impl.create "create" impl_params Val.Impl.Get) in
+    let fields, values, deps =
+      List.fold_left
+        (fun (fields, values, deps) (name, schema) ->
+          let opt = if List.mem name required then "" else " option" in
+          let s = Schema.create ~reference_base schema in
+          let ret = sprintf "%s%s" (Schema.to_string ~root s) opt in
+          let deps = update_deps deps (Schema.depends ~root s) in
+          let param_name = Param.name name in
+          let field = (param_name, ret) in
+          let value =
+            Val.create
+              (Val.Sig.create param_name ["t"] ret)
+              (Val.Impl.create param_name ["t"] Val.Impl.Get) in
+          (field :: fields, value :: values, deps))
+        ([], [], deps)
+        properties in
+    let values = create :: List.rev values in
+    let type_sig = Type.Sig.abstract "t" in
+    let type_impl = Type.Impl.record "t" fields in
+    let typ = Type.create type_sig type_impl in
+    [typ], values, deps in
 
-  let values = create :: List.rev values in
+  let phantom_type () =
+    let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.phantom "t") in
+    [typ], [], StringSet.empty in
 
   let path =
     match parent_path with
     | Some p -> String.split_on_char '.' p
     | None -> [] in
-  Mod.create ~name ~path ~types:[typ] ~values ~deps ()
+
+  let types, values, deps =
+    match schema.kind, schema.properties with
+    | Some _, _ -> alias_type ()
+    | None, Some _ -> record_type ()
+    | None, None -> phantom_type () in
+
+  Mod.create ~name ~path ~types ~values ~deps ()
 
 let insert_module m root paths =
   let rec insert acc root = function
@@ -497,7 +626,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
         |> unsnoc in
       (match parents_and_child with
       | Some (parents, child) ->
-          let parent_path = (String.concat "." parents) in
+          let parent_path = String.concat "." parents in
           let def = definition_module ~root ~reference_base ~parent_path ~name:child schema in
           let root = insert_module def root parents in
           build_definitions ~root ~definition_base ~reference_base defs
@@ -520,6 +649,6 @@ let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "") 
       ~reference_base
       definitions in
   let defs = build_paths ~root:defs ~path_base ~reference_base s.paths in
-  Mod.add_mod defs (Mod.empty ~module_rec_trick:true title ())
+  Mod.add_mod defs (Mod.empty ~recursive:true title ())
 
 let to_string = Mod.to_string
