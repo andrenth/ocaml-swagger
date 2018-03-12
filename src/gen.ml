@@ -15,19 +15,18 @@ let default z = function
   | Some x -> x
   | None -> z
 
-let snake_case s =
-  let buf = Buffer.create (String.length s) in
-  String.iteri
-    (fun i c ->
-      match c with
-      | '-' -> Buffer.add_char buf '_'
-      | 'A' .. 'Z' ->
-          if i > 0 then Buffer.add_char buf '_';
-          Buffer.add_char buf (Char.lowercase_ascii c)
-      | _ ->
-        Buffer.add_char buf c)
-    s;
-  Buffer.contents buf
+let snake_case =
+  let re1 = Re_pcre.regexp "([A-Z]+)([A-Z][a-z]{2,})" in
+  let re2 = Re_pcre.regexp "([a-z0-9])([A-Z])" in
+  let re3 = Re.compile (Re_pcre.re "-") in
+  let underscore re s =
+    let replace groups = sprintf "%s_%s" (Re.Group.get groups 1) (Re.Group.get groups 2) in
+    Re.replace re replace s in
+  fun s ->
+    let s = underscore re1 s in
+    let s = underscore re2 s in
+    let s = Re.replace_string re3 ~by:"_" s in
+    String.lowercase_ascii s
 
 let rec item_kind_to_string (items : Swagger_j.items option) = function
   | `String  -> "string"

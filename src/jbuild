@@ -13,4 +13,4 @@
 (executable
  ((name swagger)
   (public_name swagger)
-  (libraries (yojson atdgen))))
+  (libraries (atdgen re.pcre yojson))))
