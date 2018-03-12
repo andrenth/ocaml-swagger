@@ -15,7 +15,7 @@ let default z = function
   | Some x -> x
   | None -> z
 
-let camelize s =
+let snake_case s =
   let buf = Buffer.create (String.length s) in
   String.iteri
     (fun i c ->
@@ -418,7 +418,7 @@ module Param = struct
     let n =
       if n.[0] = '$' then String.sub n 1 (String.length n - 1)
       else n in
-    let n = camelize n in
+    let n = snake_case n in
     if is_keyword n then n ^ "_"
     else n
 
