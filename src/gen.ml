@@ -74,7 +74,7 @@ module Type = struct
               (fun acc (fld, typ) -> acc ^ sprintf " %s : %s;" fld typ)
               ""
               fields in
-          sprintf "%stype %s = { %s }\n" pad name s
+          sprintf "%stype %s = {%s }\n" pad name s
   end
 
   type t =
@@ -101,19 +101,33 @@ module Val = struct
   end
 
   module Impl = struct
-    type body = Get | Put | Delete
+    type body = Record | Accessor | Id | Get | Put | Post | Delete | Head | Patch | Options
     type t = string * string list * body
 
     let create name params body = (name, params, body)
 
-    let to_string ?(indent = 0) (name, params, body) =
+    let body_to_string (name, params, body) =
+      let params =
+        List.map
+          (fun p ->
+            if p.[0] = '~' || p.[0] = '?'
+            then String.sub p 1 (String.length p - 1)
+            else p)
+          params in
+      match body with
+      | Record -> sprintf "{ %s }" (String.concat "; " params)
+      | Accessor -> sprintf "t.%s" name
+      | Id -> "t"
+      | _ -> "assert false"
+
+    let to_string ?(indent = 0) ((name, params, body) as value) =
       let pad = String.make indent ' ' in
       sprintf "%slet %s %s =\n%s%s\n"
         pad
         name
         (String.concat " " params)
         (String.make (indent + 2) ' ')
-        "assert false"
+        (body_to_string value)
   end
 
   type t =
@@ -473,6 +487,16 @@ let rec return_type ~root ~base resps =
       check resp rs;
       sprintf "(%s, string) result" (resp_type ~root ~base resp)
 
+let operation_body_type = function
+  | "get" -> Val.Impl.Get
+  | "put" -> Val.Impl.Put
+  | "post" -> Val.Impl.Post
+  | "delete" -> Val.Impl.Delete
+  | "head" -> Val.Impl.Head
+  | "patch" -> Val.Impl.Patch
+  | "options" -> Val.Impl.Options
+  | op -> failwith ("unknown operation: " ^ op)
+
 let operation_val ~root ~reference_base name params = function
   | Some (op : Swagger_j.operation) ->
       let sig_params, impl_params =
@@ -482,7 +506,7 @@ let operation_val ~root ~reference_base name params = function
       (* TODO op.responses *)
       let ret = return_type ~root ~base:reference_base op.responses in
       let signature = Val.Sig.create name sig_params ret in
-      let implementation = Val.Impl.create name impl_params Val.Impl.Get in
+      let implementation = Val.Impl.create name impl_params (operation_body_type name) in
       Some (Val.create signature implementation)
   | None ->
       None
@@ -529,7 +553,7 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
     let create =
       Val.create
         (Val.Sig.create "create" [tgt] "t")
-        (Val.Impl.create "create" ["x"] Val.Impl.Get) in
+        (Val.Impl.create "create" ["t"] Val.Impl.Id) in
     [typ], [create], StringSet.empty in
 
   let record_type () =
@@ -538,7 +562,7 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
     let create =
       Val.create
         (Val.Sig.create "create" sig_params "t")
-        (Val.Impl.create "create" impl_params Val.Impl.Get) in
+        (Val.Impl.create "create" impl_params Val.Impl.Record) in
     let fields, values, deps =
       List.fold_left
         (fun (fields, values, deps) (name, schema) ->
@@ -551,7 +575,7 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
           let value =
             Val.create
               (Val.Sig.create param_name ["t"] ret)
-              (Val.Impl.create param_name ["t"] Val.Impl.Get) in
+              (Val.Impl.create param_name ["t"] Val.Impl.Accessor) in
           (field :: fields, value :: values, deps))
         ([], [], deps)
         properties in
