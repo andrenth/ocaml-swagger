@@ -43,19 +43,30 @@ module Type = struct
   module Sig = struct
     type t =
       | Abstract of string
+      | Phantom of string
 
     let abstract name = Abstract name
+    let phantom name = Phantom name
 
     let to_string ?(indent = 0) t =
       let pad = String.make indent ' ' in
-      match t with
-      | Abstract name -> sprintf "%stype %s\n" pad name
+      let name, attr =
+        match t with
+        | Abstract name -> name, " [@@deriving yojson]\n"
+        | Phantom name -> name, "" in
+      sprintf "%stype %s%s\n" pad name attr
   end
 
   module Impl = struct
+    type record_field =
+      { name : string
+      ; orig_name : string
+      ; type_ : string
+      }
+
     type t =
       | Alias of string * string
-      | Record of string * (string * string) list
+      | Record of string * record_field list
       | Phantom of string
 
     let alias name target = Alias (name, target)
@@ -66,14 +77,18 @@ module Type = struct
       let pad = String.make indent ' ' in
       match t with
       | Phantom name -> sprintf "%stype %s\n" pad name
-      | Alias (name, target) -> sprintf "%stype %s = %s\n" pad name target
+      | Alias (name, target) -> sprintf "%stype %s = %s [@@deriving yojson]\n" pad name target
       | Record (name, fields) ->
           let s =
             List.fold_left
-              (fun acc (fld, typ) -> acc ^ sprintf " %s : %s;" fld typ)
+              (fun acc { name; orig_name; type_ } ->
+                 let attr =
+                   if name = orig_name then ""
+                   else sprintf " [@key \"%s\"]" orig_name in
+                 sprintf "%s %s : %s%s;" acc name type_ attr)
               ""
               fields in
-          sprintf "%stype %s = {%s }\n" pad name s
+          sprintf "%stype %s = {%s } [@@deriving yojson]\n" pad name s
   end
 
   type t =
@@ -86,47 +101,283 @@ end
 
 module Val = struct
   module Sig = struct
-    type t = string * string list * string
+    type kind =
+      | Pure
+      | Http_request
 
-    let create name params ret = (name, params, ret)
+    type param =
+      | Unnamed of string
+      | Named of string * string
+      | Optional of string * string
 
-    let to_string ?(indent = 0) (name, params, ret) =
+    type t =
+      { name      : string
+      ; params    : param list
+      ; return    : string
+      ; kind      : kind
+      ; descr     : string option
+      }
+
+    let create ?descr kind name params return =
+      { name; params; return; kind; descr }
+
+    let pure = create Pure
+
+    (* Here "constants" are actually [unit -> string] functions to satisfy
+     * OCaml's recusive module safety requirements.
+     *
+     * See https://stackoverflow.com/q/4239045 *)
+    let constant name = pure name [Unnamed "unit"] "string"
+
+    let http_request ?descr = create ?descr Http_request
+
+    let param_to_string = function
+      | Named (n, t) -> sprintf "%s:%s" n t
+      | Unnamed t -> t
+      | Optional (n, t) -> sprintf "?%s:%s" n t
+
+    let params_to_string params =
+      let rec go acc = function
+        | [] -> acc
+        | [Optional _ as p] -> sprintf "%s%s -> unit -> " acc (param_to_string p) (* extra unit param if last is optional *)
+        | p :: ps -> go (sprintf "%s%s -> " acc (param_to_string p)) ps in
+      go "" params
+
+    let to_string ?(indent = 0) { name; params; return; kind; descr } =
       let pad = String.make indent ' ' in
       let params =
-        match params with
-        | [] -> ["unit"]
-        | _  -> params in
-      sprintf "%sval %s : %s -> %s\n" pad name (String.concat " -> " params) ret
+        match kind with
+        | Pure -> params
+        | Http_request -> params @ [Named ("uri", "Uri.t")] in
+      let doc =
+        match descr with
+        | Some d -> sprintf "%s(** %s *)\n" pad d
+        | None -> "" in
+      sprintf "%s%sval %s : %s%s\n" doc pad name (params_to_string params) return
   end
 
   module Impl = struct
-    type body = Record | Accessor | Id | Get | Put | Post | Delete | Head | Patch | Options
-    type t = string * string list * body
+    type http_verb = Get | Put | Post | Delete | Head | Patch | Options
 
-    let create name params body = (name, params, body)
+    type kind =
+      | Record_constructor
+      | Record_accessor
+      | Identity
+      | Constant of string
+      | Http_request of http_verb
+      | Derived
 
-    let body_to_string (name, params, body) =
-      let params =
-        List.map
-          (fun p ->
-            if p.[0] = '~' || p.[0] = '?'
-            then String.sub p 1 (String.length p - 1)
-            else p)
-          params in
-      match body with
-      | Record -> sprintf "{ %s }" (String.concat "; " params)
-      | Accessor -> sprintf "t.%s" name
-      | Id -> "t"
-      | _ -> "assert false"
+    type location = Swagger_j.location option
 
-    let to_string ?(indent = 0) ((name, params, body) as value) =
+    type param =
+      | Named of string * string * location
+      | Unnamed of string * string * location
+      | Optional of string * string * location
+
+    type t =
+      { name   : string
+      ; params : param list
+      ; kind   : kind
+      }
+
+    let create kind name params = { kind; name; params }
+
+    let record_constructor = create Record_constructor
+    let record_accessor = create Record_accessor
+    let identity = create Identity
+    let constant name value = create (Constant value) name [Unnamed ("()", "unit", None)]
+    let http_request verb = create (Http_request verb)
+    let derived = create Derived "" []
+
+    let param_name = function
+      | Named (n, _, _) | Unnamed (n, _, _) | Optional (n, _, _) -> n
+
+    let param_type = function
+      | Named (_, t, _) | Unnamed (_, t, _) | Optional (_, t, _) -> t
+
+    let param_location = function
+      | Named (_, _, l) | Unnamed (_, _, l) | Optional (_, _, l) -> l
+
+    let is_optional = function
+      | Optional _ -> true
+      | _ -> false
+
+    let record_constructor_body ~pad params =
+      let param_names = List.map param_name params in
+      sprintf "%s{ %s }" pad (String.concat "; " param_names)
+
+    let assoc_string_with f params =
+      params
+      |> List.map f
+      |> String.concat "; "
+      |> sprintf "[%s]"
+
+    let assoc_opt_string =
+      assoc_string_with
+        (fun p ->
+          let name = param_name p in
+          let type_ = param_type p in
+          let value =
+            if is_optional p then
+              if type_ = "string"
+              then sprintf {| match %s with Some s -> s | None -> "" |} name
+              else sprintf {| match %s with Some x -> string_of_%s x | None -> "" |} name type_
+            else
+              if type_ = "string"
+              then name
+              else sprintf "string_of_%s %s" type_ name in
+          sprintf "(\"%s\", %s)" name value)
+
+    let assoc_string =
+      assoc_string_with
+        (fun p ->
+          let name = param_name p in
+          let type_ = param_type p in
+          let value =
+            if type_ = "string"
+              then name
+              else sprintf "string_of_%s %s" type_ name in
+          sprintf "(\"%s\", %s)" name value)
+
+    let make_query params =
+      params
+      |> List.filter (fun p -> param_location p = Some `Query)
+      |> assoc_opt_string
+
+    let is_space = function
+      | ' ' | '\012' | '\n' | '\r' | '\t' -> true
+      | _ -> false
+
+    let trim_at_most n s =
+      let n = min n (String.length s) in
+      let rec go k s =
+        if s = "" then s
+        else if k < n then
+          let last = String.length s - 1 in
+          if is_space s.[0] then
+            let len = max 0 (last - if is_space s.[last] then 1 else 0) in
+            go (k + 1) (String.sub s 1 len)
+          else
+            s
+        else
+          s in
+      go 0 s
+
+    let make_path params =
+      let path_params =
+        params
+        |> List.filter (fun p -> param_location p = Some `Path)
+        |> assoc_string in
+      String.trim @@ sprintf {|
+            let open Printf in
+            let path_params = %s in
+            List.fold_left
+              (fun path (name, value) ->
+                let re = Re_pcre.regexp (sprintf "\\{%%s\\}" name) in
+                Re.replace_string re ~by:value path)
+              (request_path_template ())
+              path_params
+      |} path_params
+
+    let make_headers params =
+      params
+      |> List.filter (fun p -> param_location p = Some `Header)
+      |> function
+         | [] -> "None"
+         | hs -> sprintf {| Some (Header.add_list (Head.init ()) %s) |} (assoc_string hs)
+
+    let make_body params =
+      let body_params = params |> List.filter (fun p -> param_location p = Some `Header) in
+      match body_params with
+      | [] -> "None"
+      | [p] ->
+          let to_yojson =
+            param_type p
+            |> String.split_on_char '.'
+            |> unsnoc
+            |> some
+            |> fst
+            |> String.concat "."
+            |> sprintf "%s.to_yojson" in
+          sprintf {| Some (Body.of_string (Yojson.to_string (%s %s))) |} to_yojson (param_name p)
+      | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
+
+    let build_http_request ~pad ?(body = false) ~name params =
+      let body_param =
+        if body then sprintf "?body:(%s) " (make_body params)
+        else "" in
+      let code =
+        String.trim @@ sprintf {|
+          let open Lwt.Infix in
+          let open Cohttp in
+          let open Cohttp_lwt_unix in
+          let module Body = Cohttp_lwt.Body in
+          let query = %s in
+          let path =
+            %s in
+          let uri = Uri.with_path uri path in
+          let uri = Uri.with_query' uri (List.filter (fun (k, v) -> v <> "") query) in
+          let headers = %s in
+          Client.%s %s?headers uri >>= fun (resp, body) ->
+          let code = resp |> Response.status |> Code.code_of_status in
+          Body.to_string body >>= fun resp ->
+          Lwt.return (if code >= 200 && code < 300 then Ok resp else Error resp)
+        |} (make_query params) (make_path params) (make_headers params) name body_param in
+      code
+      |> String.split_on_char '\n'
+      |> List.map (fun l -> sprintf "%s%s" pad (trim_at_most 10 l))
+      |> String.concat "\n"
+
+    let http_get     = build_http_request            ~name:"get"
+    let http_put     = build_http_request ~body:true ~name:"put"
+    let http_post    = build_http_request ~body:true ~name:"post"
+    let http_delete  = build_http_request ~body:true ~name:"delete"
+    let http_head    = build_http_request            ~name:"head"
+    let http_patch   = build_http_request ~body:true ~name:"patch"
+    let http_options = build_http_request            ~name:"call `OPTIONS"
+
+    let body_to_string ?(indent = 0) t =
       let pad = String.make indent ' ' in
-      sprintf "%slet %s %s =\n%s%s\n"
-        pad
-        name
-        (String.concat " " params)
-        (String.make (indent + 2) ' ')
-        (body_to_string value)
+      match t.kind with
+      | Record_constructor -> record_constructor_body ~pad t.params
+      | Record_accessor -> sprintf "%st.%s" pad t.name
+      | Identity -> sprintf "%st" pad
+      | Constant v -> sprintf "%s\"%s\"" pad v
+      | Http_request Get -> http_get ~pad t.params
+      | Http_request Put -> http_put ~pad t.params
+      | Http_request Post -> http_post ~pad t.params
+      | Http_request Delete -> http_delete ~pad t.params
+      | Http_request Head -> http_head ~pad t.params
+      | Http_request Patch -> http_patch ~pad t.params
+      | Http_request Options -> http_options ~pad t.params
+      | Derived -> failwith "Val.Impl.body_to_string: derived functions have no body"
+
+    let param_to_string = function
+      | Named (n, _, _) -> sprintf "~%s" n
+      | Unnamed (n, _, _) -> n
+      | Optional (n, _, _) -> sprintf "?%s" n
+
+    let params_to_string params =
+      let rec go acc = function
+        | [] -> acc
+        | [Optional _ as p] -> sprintf "%s%s () " acc (param_to_string p)
+        | p::ps -> go (sprintf "%s%s " acc (param_to_string p)) ps in
+      go "" params
+
+    let to_string ?uri ?(indent = 0) ({ kind; name; params } as value) =
+      let pad = String.make indent ' ' in
+      let params =
+        match kind with
+        | Http_request _ -> params @ [Named ("uri", "Uri.t", None)]
+        | _ -> params in
+      match kind with
+      | Derived -> ""
+      | _ ->
+          sprintf "%slet %s %s=\n%s\n"
+            pad
+            name
+            (params_to_string params)
+            (body_to_string ~indent:(indent + 2) value)
   end
 
   type t =
@@ -151,7 +402,8 @@ let strip_base base path =
   let plen = String.length path in
   let blen = String.length base in
   if plen >= blen then
-    if base = String.sub path 0 blen then
+    let pref = String.sub path 0 blen in
+    if String.lowercase_ascii base = String.lowercase_ascii pref then
       String.sub path blen (plen - blen)
     else
       path
@@ -175,7 +427,6 @@ module Mod = struct
       if s.[0] = '{' && s.[last] = '}' then "By_" ^ String.sub s 1 (last - 1)
       else s in
     s
-    |> String.lowercase_ascii
     |> String.capitalize_ascii
     |> String.map (fun c -> if c = '-' then '_' else c)
     |> String.split_on_char '.'
@@ -329,8 +580,7 @@ let split_ref ref =
 let reference_module_path ~root ~base ref =
   let path =
     ref
-    |> String.lowercase_ascii
-    |> strip_base (String.lowercase_ascii base)
+    |> strip_base base
     |> split_ref in
   Mod.qualified_name root :: path
 
@@ -421,14 +671,28 @@ module Param = struct
     if is_keyword n then n ^ "_"
     else n
 
-  let prefixes required =
+  let prefix_strings required =
     if required
     then ("", "~")
     else ("?", "?")
 
+  let kind = function
+    | true -> `Named
+    | false -> `Optional
+
+  let create ~root ~reference_base (p : t) =
+    let t =
+      match p.location with
+      | `Body -> Schema.to_string ~root (Schema.create ~reference_base (some p.schema))
+      | _     -> kind_to_string p in
+    let n = name p.name in
+    if p.required
+    then (Val.Sig.Named (n, t), Val.Impl.Named (n, t, Some p.location))
+    else (Val.Sig.Optional (n, t), Val.Impl.Optional (n, t, Some p.location))
+
   let to_string ~root ~reference_base (p : t) =
     let open Swagger_j in
-    let sig_prefix, impl_prefix = prefixes p.required in
+    let sig_prefix, impl_prefix = prefix_strings p.required in
     let kind =
       match p.location with
       | `Body -> Schema.to_string ~root (Schema.create ~reference_base (some p.schema))
@@ -473,7 +737,8 @@ let rec return_type ~root ~base resps =
     | _ -> false in
   match resps with
   | [] ->
-      "unit" (* XXX error? *)
+(*       "unit" (* XXX error? *) *)
+      "(string, string) result Lwt.t"
   | (code, _)::rs when is_error code ->
       return_type ~root ~base rs (* ignore errors; assume strings *)
   | (_code, resp)::rs ->
@@ -484,9 +749,10 @@ let rec return_type ~root ~base resps =
         | (_code', resp')::rs when responses_match first resp' -> check first rs
         | (c, (r:Swagger_j.response_or_reference))::_ -> failwith @@ sprintf "multiple response types are not supported: %s - %s" (Swagger_j.string_of_response_or_reference resp) (Swagger_j.string_of_response_or_reference r) in
       check resp rs;
-      sprintf "(%s, string) result" (resp_type ~root ~base resp)
+(* XXX sprintf "(%s, string) result" (resp_type ~root ~base resp) *)
+      "(string, string) result Lwt.t"
 
-let operation_body_type = function
+let operation_impl_kind = function
   | "get" -> Val.Impl.Get
   | "put" -> Val.Impl.Put
   | "post" -> Val.Impl.Post
@@ -494,18 +760,19 @@ let operation_body_type = function
   | "head" -> Val.Impl.Head
   | "patch" -> Val.Impl.Patch
   | "options" -> Val.Impl.Options
-  | op -> failwith ("unknown operation: " ^ op)
+  | op -> failwith ("unknown operation for implementation: " ^ op)
 
 let operation_val ~root ~reference_base name params = function
   | Some (op : Swagger_j.operation) ->
-      let sig_params, impl_params =
+      let param_sigs, param_impls =
         operation_params (params, op.parameters)
-        |> List.map (Param.to_string ~root ~reference_base)
+        |> List.map (Param.create ~root ~reference_base)
         |> List.split in
       (* TODO op.responses *)
       let ret = return_type ~root ~base:reference_base op.responses in
-      let signature = Val.Sig.create name sig_params ret in
-      let implementation = Val.Impl.create name impl_params (operation_body_type name) in
+      let impl_kind = operation_impl_kind name in
+      let signature = Val.Sig.http_request ?descr:op.description name param_sigs ret in
+      let implementation = Val.Impl.http_request impl_kind name param_impls in
       Some (Val.create signature implementation)
   | None ->
       None
@@ -515,7 +782,12 @@ let rec keep_some = function
   | Some x :: xs -> x :: keep_some xs
   | None :: xs -> keep_some xs
 
-let path_item_vals ~root ~reference_base (item : Swagger_j.path_item) : Val.t list =
+let path_val path =
+  Val.create
+    (Val.Sig.constant "request_path_template")
+    (Val.Impl.constant "request_path_template" path)
+
+let path_item_vals ~root ~reference_base ~path (item : Swagger_j.path_item) : Val.t list =
   let get     = operation_val ~root ~reference_base "get"     item.parameters item.get in
   let put     = operation_val ~root ~reference_base "put"     item.parameters item.put in
   let post    = operation_val ~root ~reference_base "post"    item.parameters item.post in
@@ -523,7 +795,7 @@ let path_item_vals ~root ~reference_base (item : Swagger_j.path_item) : Val.t li
   let options = operation_val ~root ~reference_base "options" item.parameters item.options in
   let head    = operation_val ~root ~reference_base "head"    item.parameters item.head in
   let patch   = operation_val ~root ~reference_base "patch"   item.parameters item.patch in
-  keep_some [get; put; post; delete; options; head; patch]
+  path_val path :: keep_some [get; put; post; delete; options; head; patch]
 
 let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
   let required = default [] schema.required in
@@ -533,35 +805,38 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
     | Some d -> StringSet.add d deps
     | None -> deps in
 
+  let create_param name type_ required_params =
+    let n = Param.name name in
+    if List.mem name required_params
+    then (Val.Sig.Named (n, type_), Val.Impl.Named (n, type_, None))
+    else (Val.Sig.Optional (n, type_), Val.Impl.Optional (n, type_, None)) in
+
   let create_params =
     List.fold_left
       (fun (params, deps) (name, schema) ->
-        let param_name = Param.name name in
-        let sig_prefix, impl_prefix = Param.prefixes (List.mem name required) in
         let s = Schema.create ~reference_base schema in
-        let schema_str = Schema.to_string ~root s in
-        let sig_param = sprintf "%s%s:%s" sig_prefix param_name schema_str in
-        let impl_param = sprintf "%s%s" impl_prefix param_name in
+        let param_type = Schema.to_string ~root s in
+        let param_sig, param_impl = create_param name param_type required in
         let deps = update_deps deps (Schema.depends ~root s) in
-        (sig_param, impl_param)::params, deps)
+        (param_sig, param_impl)::params, deps)
       ([], StringSet.empty) in
 
   let alias_type () =
-    let tgt = Schema.kind_to_string ~root (Schema.create ~reference_base schema) in
-    let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.alias "t" tgt) in
+    let param_type = Schema.kind_to_string ~root (Schema.create ~reference_base schema) in
+    let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
-        (Val.Sig.create "create" [tgt] "t")
-        (Val.Impl.create "create" ["t"] Val.Impl.Id) in
+        (Val.Sig.(pure "create" [Unnamed param_type] "t"))
+        (Val.Impl.(identity "create" [Unnamed ("t", "t", None)])) in
     [typ], [create], StringSet.empty in
 
   let record_type () =
     let params, deps = create_params properties in
-    let sig_params, impl_params = params |> List.rev |> List.split in
+    let sig_params, impl_params = params |> List.split in
     let create =
       Val.create
-        (Val.Sig.create "create" sig_params "t")
-        (Val.Impl.create "create" impl_params Val.Impl.Record) in
+        (Val.Sig.pure "create" sig_params "t")
+        (Val.Impl.record_constructor "create" impl_params) in
     let fields, values, deps =
       List.fold_left
         (fun (fields, values, deps) (name, schema) ->
@@ -570,11 +845,11 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
           let ret = sprintf "%s%s" (Schema.to_string ~root s) opt in
           let deps = update_deps deps (Schema.depends ~root s) in
           let param_name = Param.name name in
-          let field = (param_name, ret) in
+          let field = Type.Impl.{ name = param_name; orig_name = name; type_ = ret } in
           let value =
             Val.create
-              (Val.Sig.create param_name ["t"] ret)
-              (Val.Impl.create param_name ["t"] Val.Impl.Accessor) in
+              (Val.Sig.pure param_name [Val.Sig.Unnamed "t"] ret)
+              (Val.Impl.record_accessor param_name [Val.Impl.Unnamed ("t", "t", None)]) in
           (field :: fields, value :: values, deps))
         ([], [], deps)
         properties in
@@ -585,7 +860,7 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
     [typ], values, deps in
 
   let phantom_type () =
-    let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.phantom "t") in
+    let typ = Type.create (Type.Sig.phantom "t") (Type.Impl.phantom "t") in
     [typ], [], StringSet.empty in
 
   let path =
@@ -631,11 +906,11 @@ let rec build_paths ~root ~path_base ~reference_base = function
         |> unsnoc in
       match parents_and_child with
       | Some (parents, child) ->
-          let child_module = Mod.with_values child (path_item_vals ~root ~reference_base item) in
+          let child_module = Mod.with_values child (path_item_vals ~root ~reference_base ~path item) in
           let root = insert_module child_module root parents in
           build_paths ~root ~path_base ~reference_base paths
       | None ->
-          let root = Mod.add_vals (path_item_vals ~root ~reference_base item) root in
+          let root = Mod.add_vals (path_item_vals ~root ~reference_base ~path item) root in
           build_paths ~root ~path_base ~reference_base paths
 
 let rec build_definitions ~root ~definition_base ~reference_base l =
