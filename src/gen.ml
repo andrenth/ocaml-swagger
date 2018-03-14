@@ -417,7 +417,6 @@ module Mod = struct
     ; types : Type.t list
     ; values : Val.t list
     ; submodules : t StringMap.t
-    ; deps : StringSet.t
     ; recursive : bool
     }
 
@@ -432,13 +431,12 @@ module Mod = struct
     |> String.split_on_char '.'
     |> List.hd
 
-  let create ~name ?(recursive = false) ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) ?(deps = StringSet.empty) () =
+  let create ~name ?(recursive = false) ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) () =
     { name = module_name name
     ; path = List.map module_name path
     ; types
     ; values
     ; submodules
-    ; deps
     ; recursive
     }
 
@@ -496,34 +494,11 @@ module Mod = struct
   let qualified_path m =
     m.path @ [m.name]
 
-  let rec is_subpath p ~candidate =
-    match p, candidate with
-    | [], [] -> true
-    | [], _ -> true
-    | _, [] -> false
-    | x::xs, y::ys when x = y -> is_subpath xs ~candidate:ys
-    | _, _ -> false
-
-  let rec depends_on other this =
-    StringSet.exists (fun d -> is_subpath (qualified_path other) ~candidate:(String.split_on_char '.' d)) this.deps
-    || StringMap.exists (fun _ m -> depends_on other m) this.submodules
-
-  let sort_by_deps =
-    List.sort
-      (fun (_, m1) (_, m2) ->
-        let d1 = depends_on m1 m2 in
-        let d2 = depends_on m2 m1 in
-        if d1 && d2 then 0
-        else if d1 then -1
-        else if d2 then 1
-        else 0)
-
   let rec sig_to_string ?(indent = 0) m =
     let pad = String.make indent ' ' in
     let submods =
       m.submodules
       |> StringMap.bindings
-      |> sort_by_deps
       |> List.fold_left
            (fun acc (name, m) ->
              let s = sig_to_string ~indent:(indent + 2) m in
@@ -545,7 +520,6 @@ module Mod = struct
     let submods =
       m.submodules
       |> StringMap.bindings
-      |> sort_by_deps
       |> List.fold_left
            (fun acc (name, m) ->
              let s = impl_to_string ~indent:(indent + 2) m in
@@ -599,19 +573,6 @@ module Schema = struct
 
   let create ~reference_base raw =
     { raw; reference_base }
-
-  let rec depends ~root t =
-    let base = t.reference_base in
-    match t.raw.ref with
-    | Some r -> Some (reference_module ~root ~base r)
-    | None ->
-        match some t.raw.kind with
-        | `Array ->
-            let open Swagger_j in
-            (match t.raw.items with
-            | Some s -> depends ~root (create ~reference_base:base s)
-            | None -> failwith "Schema.depends: array type must have an 'items' field")
-        | _ -> None
 
   let rec kind_to_string ~root t =
     let reference_base = t.reference_base in
@@ -801,10 +762,6 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
   let required = default [] schema.required in
   let properties = default [] schema.properties in
 
-  let update_deps deps = function
-    | Some d -> StringSet.add d deps
-    | None -> deps in
-
   let create_param name type_ required_params =
     let n = Param.name name in
     if List.mem name required_params
@@ -813,13 +770,12 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
 
   let create_params =
     List.fold_left
-      (fun (params, deps) (name, schema) ->
+      (fun params (name, schema) ->
         let s = Schema.create ~reference_base schema in
         let param_type = Schema.to_string ~root s in
         let param_sig, param_impl = create_param name param_type required in
-        let deps = update_deps deps (Schema.depends ~root s) in
-        (param_sig, param_impl)::params, deps)
-      ([], StringSet.empty) in
+        (param_sig, param_impl) :: params)
+      [] in
 
   let alias_type () =
     let param_type = Schema.kind_to_string ~root (Schema.create ~reference_base schema) in
@@ -828,53 +784,52 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
       Val.create
         (Val.Sig.(pure "create" [Unnamed param_type] "t"))
         (Val.Impl.(identity "create" [Unnamed ("t", "t", None)])) in
-    [typ], [create], StringSet.empty in
+    ([typ], [create]) in
 
   let record_type () =
-    let params, deps = create_params properties in
+    let params = create_params properties in
     let sig_params, impl_params = params |> List.split in
     let create =
       Val.create
         (Val.Sig.pure "create" sig_params "t")
         (Val.Impl.record_constructor "create" impl_params) in
-    let fields, values, deps =
+    let fields, values =
       List.fold_left
-        (fun (fields, values, deps) (name, schema) ->
+        (fun (fields, values) (name, schema) ->
           let opt = if List.mem name required then "" else " option" in
           let s = Schema.create ~reference_base schema in
           let ret = sprintf "%s%s" (Schema.to_string ~root s) opt in
-          let deps = update_deps deps (Schema.depends ~root s) in
           let param_name = Param.name name in
           let field = Type.Impl.{ name = param_name; orig_name = name; type_ = ret } in
           let value =
             Val.create
               (Val.Sig.pure param_name [Val.Sig.Unnamed "t"] ret)
               (Val.Impl.record_accessor param_name [Val.Impl.Unnamed ("t", "t", None)]) in
-          (field :: fields, value :: values, deps))
-        ([], [], deps)
+          (field :: fields, value :: values))
+        ([], [])
         properties in
     let values = create :: List.rev values in
     let type_sig = Type.Sig.abstract "t" in
     let type_impl = Type.Impl.record "t" fields in
     let typ = Type.create type_sig type_impl in
-    [typ], values, deps in
+    ([typ], values) in
 
   let phantom_type () =
     let typ = Type.create (Type.Sig.phantom "t") (Type.Impl.phantom "t") in
-    [typ], [], StringSet.empty in
+    ([typ], []) in
 
   let path =
     match parent_path with
     | Some p -> String.split_on_char '.' p
     | None -> [] in
 
-  let types, values, deps =
+  let types, values =
     match schema.kind, schema.properties with
     | Some _, _ -> alias_type ()
     | None, Some _ -> record_type ()
     | None, None -> phantom_type () in
 
-  Mod.create ~name ~path ~types ~values ~deps ()
+  Mod.create ~name ~path ~types ~values ()
 
 let insert_module m root paths =
   let rec insert acc root = function
