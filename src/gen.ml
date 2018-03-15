@@ -475,7 +475,7 @@ module Mod = struct
     StringMap.is_empty m.submodules
 
   let find_submodule name m =
-    StringMap.find_opt name m.submodules
+    StringMap.find_opt (module_name name) m.submodules
 
   let iter f m =
     f m;
@@ -758,7 +758,7 @@ let path_item_vals ~root ~reference_base ~path (item : Swagger_j.path_item) : Va
   let patch   = operation_val ~root ~reference_base "patch"   item.parameters item.patch in
   path_val path :: keep_some [get; put; post; delete; options; head; patch]
 
-let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
+let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
   let required = default [] schema.required in
   let properties = default [] schema.properties in
 
@@ -818,11 +818,6 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
     let typ = Type.create (Type.Sig.phantom "t") (Type.Impl.phantom "t") in
     ([typ], []) in
 
-  let path =
-    match parent_path with
-    | Some p -> String.split_on_char '.' p
-    | None -> [] in
-
   let types, values =
     match schema.kind, schema.properties with
     | Some _, _ -> alias_type ()
@@ -831,19 +826,15 @@ let definition_module ?parent_path ~root ~reference_base ~name (schema : Swagger
 
   Mod.create ~name ~path ~types ~values ()
 
-let insert_module m root paths =
-  let rec insert acc root = function
-    | [] -> Mod.add_mod m root
-    | p::ps when Mod.name root = p -> insert (p::acc) root ps
-    | p::ps ->
-        match Mod.find_submodule p root with
-        | Some subm ->
-            Mod.add_mod (insert (p::acc) subm ps) root
-        | None ->
-            let path = p::acc in
-            let pmod = insert path (Mod.empty p ~path:(List.rev acc) ()) ps in
-            Mod.add_mod pmod root in
-  insert [] root paths
+let rec insert_module m root = function
+  | [] -> Mod.add_mod m root
+  | p::ps ->
+      match Mod.find_submodule p root with
+      | Some subm ->
+          Mod.add_mod (insert_module m subm ps) root
+      | None ->
+          let subm = Mod.empty p ~path:(Mod.qualified_path root) () in
+          Mod.add_mod (insert_module m subm ps) root
 
 let remove_base base segments =
   match base, segments with
@@ -861,7 +852,7 @@ let rec build_paths ~root ~path_base ~reference_base = function
         |> unsnoc in
       match parents_and_child with
       | Some (parents, child) ->
-          let child_module = Mod.with_values child (path_item_vals ~root ~reference_base ~path item) in
+          let child_module = Mod.with_values ~path:parents child (path_item_vals ~root ~reference_base ~path item) in
           let root = insert_module child_module root parents in
           build_paths ~root ~path_base ~reference_base paths
       | None ->
@@ -879,8 +870,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
         |> unsnoc in
       (match parents_and_child with
       | Some (parents, child) ->
-          let parent_path = String.concat "." parents in
-          let def = definition_module ~root ~reference_base ~parent_path ~name:child schema in
+          let def = definition_module ~root ~reference_base ~path:parents ~name:child schema in
           let root = insert_module def root parents in
           build_definitions ~root ~definition_base ~reference_base defs
       | None ->
@@ -901,7 +891,13 @@ let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "") 
       ~definition_base
       ~reference_base
       definitions in
-  let defs = build_paths ~root:defs ~path_base ~reference_base s.paths in
-  Mod.add_mod defs (Mod.empty ~recursive:true title ())
+  let root = Mod.empty ~recursive:true title () in
+  let paths =
+    build_paths
+      ~root
+      ~path_base
+      ~reference_base
+      s.paths in
+  Mod.add_mod defs paths
 
 let to_string = Mod.to_string
