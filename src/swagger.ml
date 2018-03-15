@@ -8,6 +8,7 @@ let () =
     ~path_base:"/"
     ~definition_base:"io.k8s."
     ~reference_base:"#/definitions/io.k8s."
+    ~reference_root:"Definitions"
     swagger
   |> Gen.to_string
   |> printf "%s\n%!"
