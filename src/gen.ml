@@ -710,17 +710,6 @@ module Param = struct
     if p.required
     then (Val.Sig.named n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
     else (Val.Sig.optional n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
-
-  (*let to_string ~reference_base (p : t) =
-    let open Swagger_j in
-    let sig_prefix, impl_prefix = prefix_strings p.required in
-    let kind =
-      match p.location with
-      | `Body -> Schema.to_string (Schema.create ~reference_base ~reference_root (some p.schema))
-      | _     -> kind_to_string p in
-    let sig_str = sprintf "%s%s:%s" sig_prefix (name p.name) kind in
-    let impl_str = sprintf "%s%s" impl_prefix (name p.name) in
-    (sig_str, impl_str)*)
 end
 
 let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
