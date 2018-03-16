@@ -629,7 +629,7 @@ module Schema = struct
   let create ~reference_base ~reference_root raw =
     { raw; reference_base; reference_root }
 
-  let rec kind_to_string ~root t =
+  let rec kind_to_string t =
     let reference_base = t.reference_base in
     let reference_root = t.reference_root in
     match t.raw.ref with
@@ -643,20 +643,20 @@ module Schema = struct
         | `Object  ->
             let open Swagger_j in
             (match t.raw.additional_properties with
-            | Some props -> sprintf "(string * %s) list" (kind_to_string ~root (create ~reference_base ~reference_root props))
+            | Some props -> sprintf "(string * %s) list" (kind_to_string (create ~reference_base ~reference_root props))
             | None -> failwith "Schema.kind_to_string: object without additional_properties")
         | `Array   ->
             let open Swagger_j in
             match t.raw.items with
-            | Some s -> kind_to_string ~root (create ~reference_base ~reference_root s) ^ " list"
+            | Some s -> kind_to_string (create ~reference_base ~reference_root s) ^ " list"
             | None -> failwith "Schema.kind_to_string: array type must have an 'items' field"
 
-  let to_string ~root t =
+  let to_string t =
     let reference_base = t.reference_base in
     let reference_root = t.reference_root in
     match t.raw.ref with
     | Some r -> reference_type ~reference_base ~reference_root r
-    | None -> kind_to_string ~root t
+    | None -> kind_to_string t
 end
 
 module Param = struct
@@ -698,10 +698,10 @@ module Param = struct
     | true -> `Named
     | false -> `Optional
 
-  let create ~root ~reference_base ~reference_root (p : t) =
+  let create ~reference_base ~reference_root (p : t) =
     let t =
       match p.location with
-      | `Body -> Schema.to_string ~root (Schema.create ~reference_base ~reference_root (some p.schema))
+      | `Body -> Schema.to_string (Schema.create ~reference_base ~reference_root (some p.schema))
       | _     -> kind_to_string p in
     let n =
       if p.location = `Query
@@ -711,16 +711,16 @@ module Param = struct
     then (Val.Sig.named n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
     else (Val.Sig.optional n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
 
-  let to_string ~root ~reference_base (p : t) =
+  (*let to_string ~reference_base (p : t) =
     let open Swagger_j in
     let sig_prefix, impl_prefix = prefix_strings p.required in
     let kind =
       match p.location with
-      | `Body -> Schema.to_string ~root (Schema.create ~reference_base ~reference_root:root (some p.schema))
+      | `Body -> Schema.to_string (Schema.create ~reference_base ~reference_root (some p.schema))
       | _     -> kind_to_string p in
     let sig_str = sprintf "%s%s:%s" sig_prefix (name p.name) kind in
     let impl_str = sprintf "%s%s" impl_prefix (name p.name) in
-    (sig_str, impl_str)
+    (sig_str, impl_str)*)
 end
 
 let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
@@ -739,13 +739,13 @@ let operation_params = function
   | None, Some ps -> ps
   | Some ps, Some ps' -> merge_params ps ps'
 
-let resp_type ~root ~reference_base ~reference_root (resp : Swagger_j.response_or_reference) =
-  let ref_type = reference_type ~reference_base ~reference_root:root in
+let resp_type ~reference_base ~reference_root (resp : Swagger_j.response_or_reference) =
+  let ref_type = reference_type ~reference_base ~reference_root in
   match resp.ref with
   | Some r -> ref_type r
   | None ->
       match resp.schema with
-      | Some s -> Schema.create ~reference_base ~reference_root:root s |> Schema.to_string ~root
+      | Some s -> Schema.create ~reference_base ~reference_root s |> Schema.to_string
       | None -> "unit"
 
 let rec return_type ~root ~base resps =
@@ -777,7 +777,7 @@ let operation_val ~root ~reference_base ~reference_root name params = function
   | Some (op : Swagger_j.operation) ->
       let param_sigs, param_impls =
         operation_params (params, op.parameters)
-        |> List.map (Param.create ~root ~reference_base ~reference_root)
+        |> List.map (Param.create ~reference_base ~reference_root)
         |> List.split in
       (* TODO op.responses *)
       let ret = return_type ~root ~base:reference_base op.responses in
@@ -822,13 +822,13 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
     List.fold_left
       (fun params (name, schema) ->
         let s = Schema.create ~reference_base ~reference_root:root schema in
-        let param_type = Schema.to_string ~root s in
+        let param_type = Schema.to_string s in
         let param_sig, param_impl = create_param name param_type required in
         (param_sig, param_impl) :: params)
       [] in
 
   let alias_type () =
-    let param_type = Schema.kind_to_string ~root (Schema.create ~reference_base ~reference_root:root schema) in
+    let param_type = Schema.kind_to_string (Schema.create ~reference_base ~reference_root:root schema) in
     let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
@@ -848,7 +848,7 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
         (fun (fields, values) (name, schema) ->
           let opt = if List.mem name required then "" else " option" in
           let s = Schema.create ~reference_base ~reference_root:root schema in
-          let ret = sprintf "%s%s" (Schema.to_string ~root s) opt in
+          let ret = sprintf "%s%s" (Schema.to_string s) opt in
           let param_name = Param.name name in
           let field = Type.Impl.{ name = param_name; orig_name = name; type_ = ret } in
           let value =
