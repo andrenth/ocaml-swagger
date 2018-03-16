@@ -121,6 +121,10 @@ module Val = struct
     let create ?descr kind name params return =
       { name; params; return; kind; descr }
 
+    let named name type_ = Named (name, type_)
+    let unnamed type_ = Unnamed type_
+    let optional name type_ = Optional (name, type_)
+
     let pure = create Pure
 
     (* Here "constants" are actually [unit -> string] functions to satisfy
@@ -167,12 +171,32 @@ module Val = struct
       | Http_request of http_verb
       | Derived
 
-    type location = Swagger_j.location option
+    type origin =
+      { location : Swagger_j.location
+      ; orig_name : string
+      }
+
+    type param_data =
+      { name : string
+      ; type_ : string
+      }
 
     type param =
-      | Named of string * string * location
-      | Unnamed of string * string * location
-      | Optional of string * string * location
+      | Named of param_data * origin option
+      | Unnamed of param_data
+      | Optional of param_data * origin option
+
+    let origin (p : Swagger_j.parameter_or_reference) =
+      { location = p.location; orig_name = p.name }
+
+    let named ?origin name type_ =
+      Named ({ name; type_ }, origin)
+
+    let unnamed name type_ =
+      Unnamed { name; type_ }
+
+    let optional ?origin name type_ =
+      Optional ({ name; type_ }, origin)
 
     type t =
       { name   : string
@@ -185,18 +209,27 @@ module Val = struct
     let record_constructor = create Record_constructor
     let record_accessor = create Record_accessor
     let identity = create Identity
-    let constant name value = create (Constant value) name [Unnamed ("()", "unit", None)]
+    let constant name value = create (Constant value) name [unnamed "()" "unit"]
     let http_request verb = create (Http_request verb)
     let derived = create Derived "" []
 
     let param_name = function
-      | Named (n, _, _) | Unnamed (n, _, _) | Optional (n, _, _) -> n
+      | Named (p, _) | Unnamed p | Optional (p, _) -> p.name
 
     let param_type = function
-      | Named (_, t, _) | Unnamed (_, t, _) | Optional (_, t, _) -> t
+      | Named (p, _) | Unnamed p | Optional (p, _) -> p.type_
+
+    let param_orig_name = function
+      | Named (_, Some origin) -> Some origin.orig_name
+      | Optional (_, Some origin) -> Some origin.orig_name
+      | Named (_, None) | Optional (_, None) | Unnamed _ -> None
 
     let param_location = function
-      | Named (_, _, l) | Unnamed (_, _, l) | Optional (_, _, l) -> l
+      | Named (_, Some origin) -> Some origin.location
+      | Named (_, None) -> None
+      | Optional (_, Some origin) -> Some origin.location
+      | Optional (_, None) -> None
+      | Unnamed _ -> None
 
     let is_optional = function
       | Optional _ -> true
@@ -223,20 +256,22 @@ module Val = struct
       |> sprintf "[%s]"
 
     let assoc_opt_string =
+      let string_of = sprintf "string_of_%s %s" in
+      let string_opt_to_string = sprintf {| match %s with Some s -> s | None -> "" |} in
+      let opt_to_string = sprintf {| match %s with Some x -> string_of_%s x | None -> "" |} in
       assoc_string_with
         (fun p ->
-          let name = param_name p in
-          let type_ = param_type p in
-          let value =
-            if is_optional p then
-              if type_ = "string"
-              then sprintf {| match %s with Some s -> s | None -> "" |} name
-              else sprintf {| match %s with Some x -> string_of_%s x | None -> "" |} name type_
-            else
-              if type_ = "string"
-              then name
-              else sprintf "string_of_%s %s" type_ name in
-          sprintf "(\"%s\", %s)" name value)
+          let orig_name, value =
+            match p with
+            | Named ({ name; type_ = "string"}, Some origin) -> (origin.orig_name, name)
+            | Named ({ name; type_ }, Some origin) -> (origin.orig_name, string_of type_ name)
+            | Named ({ name; type_ = "string"}, None) -> (name, name)
+            | Named ({ name; type_ }, None) -> (name, string_of type_ name)
+            | Optional ({ name; type_ = "string"}, Some origin) -> (origin.orig_name, string_opt_to_string name)
+            | Optional ({ name; type_ }, Some origin) -> (origin.orig_name, opt_to_string name type_)
+            | Optional ({ name; type_ }, None) -> (name, opt_to_string name type_)
+            | Unnamed _ -> failwith "unnamed parameters don't go in requests" in
+          sprintf "(\"%s\", %s)" orig_name value)
 
     let assoc_string =
       assoc_string_with
@@ -372,9 +407,9 @@ module Val = struct
       | Derived -> failwith "Val.Impl.body_to_string: derived functions have no body"
 
     let param_to_string = function
-      | Named (n, _, _) -> sprintf "~%s" n
-      | Unnamed (n, _, _) -> n
-      | Optional (n, _, _) -> sprintf "?%s" n
+      | Named (p, _) -> sprintf "~%s" p.name
+      | Unnamed p -> p.name
+      | Optional (p, _) -> sprintf "?%s" p.name
 
     let params_to_string params =
       let rec go acc = function
@@ -387,7 +422,7 @@ module Val = struct
       let pad = String.make indent ' ' in
       let params =
         match kind with
-        | Http_request _ -> params @ [Named ("uri", "Uri.t", None)]
+        | Http_request _ -> params @ [named "uri" "Uri.t"]
         | _ -> params in
       match kind with
       | Derived -> ""
@@ -673,8 +708,8 @@ module Param = struct
       then "query_" ^ name p.name
       else name p.name in
     if p.required
-    then (Val.Sig.Named (n, t), Val.Impl.Named (n, t, Some p.location))
-    else (Val.Sig.Optional (n, t), Val.Impl.Optional (n, t, Some p.location))
+    then (Val.Sig.named n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
+    else (Val.Sig.optional n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
 
   let to_string ~root ~reference_base (p : t) =
     let open Swagger_j in
@@ -780,8 +815,8 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
   let create_param name type_ required_params =
     let n = Param.name name in
     if List.mem name required_params
-    then (Val.Sig.Named (n, type_), Val.Impl.Named (n, type_, None))
-    else (Val.Sig.Optional (n, type_), Val.Impl.Optional (n, type_, None)) in
+    then (Val.Sig.named n type_, Val.Impl.named n type_)
+    else (Val.Sig.optional n type_, Val.Impl.optional n type_) in
 
   let create_params =
     List.fold_left
@@ -797,8 +832,8 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
     let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
-        (Val.Sig.(pure "create" [Unnamed param_type] "t"))
-        (Val.Impl.(identity "create" [Unnamed ("t", "t", None)])) in
+        (Val.Sig.(pure "create" [unnamed param_type] "t"))
+        (Val.Impl.(identity "create" [unnamed "t" "t"])) in
     ([typ], [create]) in
 
   let record_type () =
@@ -819,7 +854,7 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
           let value =
             Val.create
               (Val.Sig.pure param_name [Val.Sig.Unnamed "t"] ret)
-              (Val.Impl.record_accessor param_name [Val.Impl.Unnamed ("t", "t", None)]) in
+              (Val.Impl.record_accessor param_name [Val.Impl.unnamed "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])
         properties in
