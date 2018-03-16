@@ -698,15 +698,24 @@ module Param = struct
     | true -> `Named
     | false -> `Optional
 
-  let create ~reference_base ~reference_root (p : t) =
+  let string_of_location = function
+    | `Query    -> "query"
+    | `Header   -> "header"
+    | `Path     -> "path"
+    | `FormData -> "formData"
+    | `Body     -> "body"
+
+  let create ?(duplicate = false) ~reference_base ~reference_root (p : t) =
     let t =
       match p.location with
       | `Body -> Schema.to_string (Schema.create ~reference_base ~reference_root (some p.schema))
       | _     -> kind_to_string p in
     let n =
-      if p.location = `Query
-      then "query_" ^ name p.name
-      else name p.name in
+      let n = name p.name in
+      let loc = string_of_location p.location in
+      if duplicate && n <> loc
+      then sprintf "%s_%s" loc n
+      else n in
     if p.required
     then (Val.Sig.named n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
     else (Val.Sig.optional n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
@@ -762,11 +771,25 @@ let rec return_type ~root ~base resps =
 (* XXX sprintf "(%s, string) result" (resp_type ~root ~base resp) *)
       "(string, string) result Lwt.t"
 
+let make_dups params =
+  List.fold_left
+    (fun dups (p : Swagger_j.parameter_or_reference) ->
+      match StringMap.find_opt p.name dups with
+      | Some count -> StringMap.add p.name (count + 1) dups
+      | None -> StringMap.add p.name 1 dups)
+    StringMap.empty
+    params
+
 let operation_val ~root ~reference_base ~reference_root name params = function
   | Some (op : Swagger_j.operation) ->
+      let params = operation_params (params, op.parameters) in
+      let dups = make_dups params in
       let param_sigs, param_impls =
-        operation_params (params, op.parameters)
-        |> List.map (Param.create ~reference_base ~reference_root)
+        params
+        |> List.map
+             (fun (p : Swagger_j.parameter_or_reference) ->
+               let duplicate = StringMap.find p.name dups > 1 in
+               Param.create ~duplicate ~reference_base ~reference_root p)
         |> List.split in
       (* TODO op.responses *)
       let ret = return_type ~root ~base:reference_base op.responses in
