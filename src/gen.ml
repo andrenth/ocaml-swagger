@@ -15,6 +15,11 @@ let default z = function
   | Some x -> x
   | None -> z
 
+let rec keep_some = function
+  | [] -> []
+  | Some x :: xs -> x :: keep_some xs
+  | None :: xs -> keep_some xs
+
 let snake_case =
   let re1 = Re_pcre.regexp "([A-Z]+)([A-Z][a-z]{2,})" in
   let re2 = Re_pcre.regexp "([a-z0-9])([A-Z])" in
@@ -107,8 +112,8 @@ module Val = struct
 
     type param =
       | Unnamed of string
-      | Named of string * string
-      | Optional of string * string
+      | Named of string * string * string option
+      | Optional of string * string * string option
 
     type return =
       | Simple of string
@@ -119,15 +124,21 @@ module Val = struct
       ; params    : param list
       ; return    : return
       ; kind      : kind
-      ; descr     : string option
+      ; descr     : string list
       }
 
+    let param_descr = function
+      | Unnamed _ -> None
+      | Named (_, _, d) -> d
+      | Optional (_, _, d) -> d
+
     let create ?descr kind name params return =
+      let descr = descr :: List.map param_descr params |> keep_some in
       { name; params; return; kind; descr }
 
-    let named name type_ = Named (name, type_)
+    let named ?descr name type_ = Named (name, type_, descr)
     let unnamed type_ = Unnamed type_
-    let optional name type_ = Optional (name, type_)
+    let optional ?descr name type_ = Optional (name, type_, descr)
 
     let pure ?descr name params ret =
       create ?descr Pure name params (Simple ret)
@@ -143,9 +154,9 @@ module Val = struct
       create ?descr Http_request name params (Async ret)
 
     let param_to_string = function
-      | Named (n, t) -> sprintf "%s:%s" n t
+      | Named (n, t, _) -> sprintf "%s:%s" n t
       | Unnamed t -> t
-      | Optional (n, t) -> sprintf "?%s:%s" n t
+      | Optional (n, t, _) -> sprintf "?%s:%s" n t
 
     let return_to_string = function
       | Simple t -> t
@@ -166,8 +177,17 @@ module Val = struct
         | Http_request -> params @ [named "uri" "Uri.t"] in
       let doc =
         match descr with
-        | Some d -> sprintf "%s(** %s *)\n" pad d
-        | None -> "" in
+        | [] -> ""
+        | _ ->
+            let comment_pad = pad ^ String.make 3 ' ' in
+            let descr =
+              List.mapi
+                (fun i d ->
+                   let d = String.capitalize_ascii d in
+                   if i = 0 then sprintf "%s(** %s\n" pad d
+                   else sprintf "@param %s %s" comment_pad d)
+                descr in
+            "\n" ^ String.concat "\n" descr ^ " *)\n" in
       sprintf "%s%sval %s : %s%s\n"
         doc
         pad
@@ -763,9 +783,13 @@ module Param = struct
       if duplicate && n <> loc
       then sprintf "%s_%s" loc n
       else n in
+    let descr =
+      match p.description with
+      | Some d -> Some (sprintf "%s %s" n d)
+      | None -> None in
     if p.required
-    then (Val.Sig.named n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
-    else (Val.Sig.optional n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
+    then (Val.Sig.named ?descr n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
+    else (Val.Sig.optional ?descr n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
 end
 
 let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
@@ -855,11 +879,6 @@ let operation_val ~root ~reference_base ~reference_root name params = function
       Some (Val.create signature implementation)
   | None ->
       None
-
-let rec keep_some = function
-  | [] -> []
-  | Some x :: xs -> x :: keep_some xs
-  | None :: xs -> keep_some xs
 
 let path_val path =
   Val.create
