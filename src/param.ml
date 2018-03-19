@@ -37,7 +37,7 @@ let name n =
   let n =
     if n.[0] = '$' then String.sub n 1 (String.length n - 1)
     else n in
-  let n = snake_case n in
+  let n = snake_case n |> String.lowercase_ascii in
   if is_keyword n then n ^ "_"
   else n
 
