@@ -30,6 +30,7 @@ let rec kind_to_string (p : t) =
                           ^ "'items' field")
 
 let is_keyword = function
+  | "external"
   | "object"
   | "to"
   | "type" -> true
