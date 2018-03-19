@@ -1,0 +1,74 @@
+open Printf
+open Util
+
+type t = Swagger_j.parameter_or_reference
+
+let rec item_kind_to_string (items : Swagger_j.items option) = function
+  | `String  -> "string"
+  | `Number  -> "float"
+  | `Integer -> "int"
+  | `Boolean -> "bool"
+  | `Array   ->
+      let open Swagger_j in
+      match items with
+      | Some is -> item_kind_to_string is.items is.kind ^ " list"
+      | None -> failwith "item_kind_to_string: array type must have an 'items' field"
+
+let rec kind_to_string (p : t) =
+  match some p.kind with
+  | `String  -> "string"
+  | `Number  -> "float"
+  | `Integer -> "int"
+  | `Boolean -> "bool"
+  | `File -> "file"
+  | `Array   ->
+      let open Swagger_j in
+      match p.items with
+      | Some items -> item_kind_to_string items.items items.kind ^ " array"
+      | None -> failwith "Param.kind_to_string: array type must have an 'items' field"
+
+let is_keyword = function
+  | "object"
+  | "to"
+  | "type" -> true
+  | _ -> false
+
+let name n =
+  let n =
+    if n.[0] = '$' then String.sub n 1 (String.length n - 1)
+    else n in
+  let n = snake_case n in
+  if is_keyword n then n ^ "_"
+  else n
+
+let prefix_strings required =
+  if required
+  then ("", "~")
+  else ("?", "?")
+
+let kind = function
+  | true -> `Named
+  | false -> `Optional
+
+let string_of_location = function
+  | `Query    -> "query"
+  | `Header   -> "header"
+  | `Path     -> "path"
+  | `FormData -> "formData"
+  | `Body     -> "body"
+
+let create ?(duplicate = false) ~reference_base ~reference_root (p : t) =
+  let t =
+    match p.location with
+    | `Body -> Schema.to_string (Schema.create ~reference_base ~reference_root (some p.schema))
+    | _     -> kind_to_string p in
+  let n =
+    let n = name p.name in
+    let loc = string_of_location p.location in
+    if duplicate && n <> loc
+    then sprintf "%s_%s" loc n
+    else n in
+  let descr = p.description in
+  if p.required
+  then (Val.Sig.named ?descr n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
+  else (Val.Sig.optional ?descr n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
