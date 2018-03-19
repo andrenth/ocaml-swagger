@@ -28,10 +28,14 @@ let snake_case =
     let replace groups = sprintf "%s_%s" (Re.Group.get groups 1) (Re.Group.get groups 2) in
     Re.replace re replace s in
   fun s ->
-    let s = underscore re1 s in
-    let s = underscore re2 s in
-    let s = Re.replace_string re3 ~by:"_" s in
-    String.lowercase_ascii s
+    let len = String.length s in
+    if len > 1 then
+      let s = underscore re1 s in
+      let s = underscore re2 s in
+      let s = Re.replace_string re3 ~by:"_" s in
+      sprintf "%c" s.[0] ^ String.lowercase_ascii (String.sub s 1 (String.length s - 1))
+    else
+      s
 
 let rec item_kind_to_string (items : Swagger_j.items option) = function
   | `String  -> "string"
@@ -110,10 +114,15 @@ module Val = struct
       | Pure
       | Http_request
 
+    type param_data =
+      { name : string
+      ; descr : string option
+      }
+
     type param =
       | Unnamed of string
-      | Named of string * string * string option
-      | Optional of string * string * string option
+      | Named of param_data * string
+      | Optional of param_data * string
 
     type return =
       | Simple of string
@@ -129,16 +138,18 @@ module Val = struct
 
     let param_descr = function
       | Unnamed _ -> None
-      | Named (_, _, d) -> d
-      | Optional (_, _, d) -> d
+      | Named ({ name; descr = Some descr }, _) -> Some (sprintf "%s %s" name descr)
+      | Optional ({ name; descr = Some descr }, _) -> Some (sprintf "%s %s" name descr)
+      | Named ({ descr = None }, _) -> None
+      | Optional ({ descr = None }, _) -> None
 
     let create ?descr kind name params return =
       let descr = descr :: List.map param_descr params |> keep_some in
       { name; params; return; kind; descr }
 
-    let named ?descr name type_ = Named (name, type_, descr)
+    let named ?descr name type_ = Named ({ name; descr }, type_)
     let unnamed type_ = Unnamed type_
-    let optional ?descr name type_ = Optional (name, type_, descr)
+    let optional ?descr name type_ = Optional ({ name; descr }, type_)
 
     let pure ?descr name params ret =
       create ?descr Pure name params (Simple ret)
@@ -154,9 +165,9 @@ module Val = struct
       create ?descr Http_request name params (Async ret)
 
     let param_to_string = function
-      | Named (n, t, _) -> sprintf "%s:%s" n t
-      | Unnamed t -> t
-      | Optional (n, t, _) -> sprintf "?%s:%s" n t
+      | Named ({ name }, type_) -> sprintf "%s:%s" name type_
+      | Unnamed type_ -> type_
+      | Optional ({ name }, type_) -> sprintf "?%s:%s" name type_
 
     let return_to_string = function
       | Simple t -> t
@@ -183,9 +194,13 @@ module Val = struct
             let descr =
               List.mapi
                 (fun i d ->
-                   let d = String.capitalize_ascii d in
-                   if i = 0 then sprintf "%s(** %s\n" pad d
-                   else sprintf "@param %s %s" comment_pad d)
+                  let d =
+                    d
+                    |> String.split_on_char ' '
+                    |> List.map snake_case
+                    |> String.concat " " in
+                   if i = 0 then sprintf "%s(** %s\n" pad (String.capitalize_ascii d)
+                   else sprintf "%s @param %s" comment_pad d)
                 descr in
             "\n" ^ String.concat "\n" descr ^ " *)\n" in
       sprintf "%s%sval %s : %s%s\n"
@@ -783,10 +798,7 @@ module Param = struct
       if duplicate && n <> loc
       then sprintf "%s_%s" loc n
       else n in
-    let descr =
-      match p.description with
-      | Some d -> Some (sprintf "%s %s" n d)
-      | None -> None in
+    let descr = p.description in
     if p.required
     then (Val.Sig.named ?descr n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
     else (Val.Sig.optional ?descr n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
