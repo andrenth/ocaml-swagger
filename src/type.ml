@@ -36,8 +36,10 @@ module Impl = struct
   let to_string ?(indent = 0) t =
     let pad = String.make indent ' ' in
     match t with
-    | Phantom name -> sprintf "%stype %s\n" pad name
-    | Alias (name, target) -> sprintf "%stype %s = %s [@@deriving yojson]\n" pad name target
+    | Phantom name ->
+        sprintf "%stype %s\n" pad name
+    | Alias (name, target) ->
+        sprintf "%stype %s = %s [@@deriving yojson]\n" pad name target
     | Record (name, fields) ->
         let s =
           List.fold_left

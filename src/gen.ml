@@ -10,12 +10,15 @@ module StringSet = Set.Make (struct
   let compare = compare
 end)
 
-let merge_params (ps1 : Swagger_j.parameter_or_reference list) (ps2 : Swagger_j.parameter_or_reference list) =
+let merge_params (ps1 : Swagger_j.parameter_or_reference list)
+                 (ps2 : Swagger_j.parameter_or_reference list) =
   let open Swagger_j in
   let rec merge acc = function
     | [] -> acc
     | (p : Swagger_j.parameter_or_reference)::ps ->
-        if List.exists (fun (q : Swagger_j.parameter_or_reference) -> p.name = q.name) acc
+        let same_name (q : Swagger_j.parameter_or_reference) =
+          p.name = q.name in
+        if List.exists same_name acc
         then merge acc ps
         else merge (p::acc) ps in
   merge ps2 ps1
@@ -31,11 +34,16 @@ let reference_module_and_type ~reference_base ~reference_root r =
   let ref_type = sprintf "%s.t" ref_module in
   (Some ref_module, ref_type)
 
-let resp_type ~reference_base ~reference_root (resp : Swagger_j.response_or_reference) =
+let resp_type ~reference_base
+              ~reference_root
+              (resp : Swagger_j.response_or_reference) =
   match resp.ref, resp.schema with
-  | None, None -> (None, "unit")
-  | Some _, Some _ -> failwith "response cannot be a reference and a schema simultaneously"
-  | Some r, None -> reference_module_and_type ~reference_base ~reference_root r
+  | None, None ->
+      (None, "unit")
+  | Some _, Some _ ->
+      failwith "response cannot be a reference and a schema simultaneously"
+  | Some r, None ->
+      reference_module_and_type ~reference_base ~reference_root r
   | None, Some s ->
       let s = Schema.create ~reference_base ~reference_root s in
       match Schema.reference s with
@@ -46,24 +54,32 @@ let rec return_type ~reference_root ~reference_base resps =
   let is_error code =
     let code = int_of_string code in
     code < 200 || code >= 300 in
-  let responses_match (r1 : Swagger_j.response_or_reference) (r2 : Swagger_j.response_or_reference) =
+  let responses_match (r1 : Swagger_j.response_or_reference)
+                      (r2 : Swagger_j.response_or_reference) =
     match r1.schema, r2.schema with
     | Some s1, Some s2 -> s1 = s2
     | _ -> false in
   match resps with
   | [] -> None, "unit"
   | (code, _)::rs when is_error code ->
-      return_type ~reference_root ~reference_base rs (* ignore errors; assume strings *)
+      (* ignore errors; assume strings *)
+      return_type ~reference_root ~reference_base rs
   | (_code, resp)::rs ->
       (* check all 2xx responses return the same type *)
       let rec check first = function
-        | [] -> ()
-        | (code, _)::res when is_error code -> check first res
-        | (_code', resp')::rs when responses_match first resp' -> check first rs
-        | (c, (r:Swagger_j.response_or_reference))::_ -> failwith @@ sprintf "multiple response types are not supported: %s - %s" (Swagger_j.string_of_response_or_reference resp) (Swagger_j.string_of_response_or_reference r) in
+        | [] ->
+            ()
+        | (code, _)::res when is_error code ->
+            check first res
+        | (_code', resp')::rs when responses_match first resp' ->
+            check first rs
+        | (c, (r:Swagger_j.response_or_reference))::_ ->
+            failwith @@
+              sprintf "multiple response types are not supported: %s - %s"
+                (Swagger_j.string_of_response_or_reference resp)
+                (Swagger_j.string_of_response_or_reference r) in
       check resp rs;
       resp_type ~reference_base ~reference_root resp
-(*       "(string, string) result Lwt.t" *)
 
 let make_dups params =
   List.fold_left
@@ -85,15 +101,18 @@ let operation_val ~root ~reference_base ~reference_root name params = function
                let duplicate = StringMap.find p.name dups > 1 in
                Param.create ~duplicate ~reference_base ~reference_root p)
         |> List.split in
-      (* TODO op.responses *)
-      let return_module, return_type = return_type ~reference_root ~reference_base op.responses in
+      let return_module, return_type =
+        return_type ~reference_root ~reference_base op.responses in
       let verb = Val.Impl.http_verb_of_string name in
-      let signature = Val.Sig.http_request ?descr:op.description name param_sigs return_type in
+      let signature =
+        let descr = op.description in
+        Val.Sig.http_request ?descr name param_sigs return_type in
       let return =
         match return_module with
         | Some module_name -> Val.Impl.Module module_name
         | None -> Val.Impl.Type return_type in
-      let implementation = Val.Impl.http_request verb name param_impls ~return in
+      let implementation =
+        Val.Impl.http_request verb name param_impls ~return in
       Some (Val.create signature implementation)
   | None ->
       None
@@ -104,16 +123,22 @@ let path_val path =
     (Val.Impl.constant "request_path_template" path)
 
 let path_item_vals ~root ~reference_base ~reference_root ~path (item : Swagger_j.path_item) : Val.t list =
-  let get     = operation_val ~root ~reference_base ~reference_root "get"     item.parameters item.get in
-  let put     = operation_val ~root ~reference_base ~reference_root "put"     item.parameters item.put in
-  let post    = operation_val ~root ~reference_base ~reference_root "post"    item.parameters item.post in
-  let delete  = operation_val ~root ~reference_base ~reference_root "delete"  item.parameters item.delete in
-  let options = operation_val ~root ~reference_base ~reference_root "options" item.parameters item.options in
-  let head    = operation_val ~root ~reference_base ~reference_root "head"    item.parameters item.head in
-  let patch   = operation_val ~root ~reference_base ~reference_root "patch"   item.parameters item.patch in
+  let operation_val name =
+    operation_val ~root ~reference_base ~reference_root name item.parameters in
+  let get     = operation_val "get"     item.get in
+  let put     = operation_val "put"     item.put in
+  let post    = operation_val "post"    item.post in
+  let delete  = operation_val "delete"  item.delete in
+  let options = operation_val "options" item.options in
+  let head    = operation_val "head"    item.head in
+  let patch   = operation_val "patch"   item.patch in
   path_val path :: keep_some [get; put; post; delete; options; head; patch]
 
-let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger_j.schema) : Mod.t =
+let definition_module ?(path = [])
+                      ~root
+                      ~reference_base
+                      ~name
+                      (schema : Swagger_j.schema) =
   let required = default [] schema.required in
   let properties = default [] schema.properties in
 
@@ -133,8 +158,13 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
       [] in
 
   let alias_type () =
-    let param_type = Schema.kind_to_string (Schema.create ~reference_base ~reference_root:root schema) in
-    let typ = Type.create (Type.Sig.abstract "t") (Type.Impl.alias "t" param_type) in
+    let param_type =
+      Schema.kind_to_string
+        (Schema.create ~reference_base ~reference_root:root schema) in
+    let typ =
+      Type.create
+        (Type.Sig.abstract "t")
+        (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
         (Val.Sig.(pure "create" [unnamed param_type] "t"))
@@ -154,12 +184,13 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
           let opt = if List.mem name required then "" else " option" in
           let s = Schema.create ~reference_base ~reference_root:root schema in
           let ret = sprintf "%s%s" (Schema.to_string s) opt in
-          let param_name = Param.name name in
-          let field = Type.Impl.{ name = param_name; orig_name = name; type_ = ret } in
+          let pname = Param.name name in
+          let field =
+            Type.Impl.{ name = pname; orig_name = name; type_ = ret } in
           let value =
             Val.create
-              (Val.Sig.pure param_name [Val.Sig.Unnamed "t"] ret)
-              (Val.Impl.record_accessor param_name [Val.Impl.unnamed "t" "t"]) in
+              (Val.Sig.pure pname [Val.Sig.Unnamed "t"] ret)
+              (Val.Impl.record_accessor pname [Val.Impl.unnamed "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])
         properties in
@@ -182,7 +213,8 @@ let definition_module ?(path = []) ~root ~reference_base ~name (schema : Swagger
   Mod.create ~name ~path ~types ~values ()
 
 let rec insert_module m root = function
-  | [] -> Mod.add_mod m root
+  | [] ->
+      Mod.add_mod m root
   | p::ps ->
       match Mod.find_submodule p root with
       | Some subm ->
@@ -197,7 +229,8 @@ let remove_base base segments =
   | _ -> segments
 
 let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
-  | [] -> root
+  | [] ->
+      root
   | (path, item) :: paths ->
       let parents_and_child =
         path
@@ -229,18 +262,27 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
         |> unsnoc in
       (match parents_and_child with
       | Some (parents, child) ->
-          let def = definition_module ~root ~reference_base ~path:parents ~name:child schema in
+          let def =
+            definition_module
+              ~root ~reference_base ~path:parents ~name:child schema in
           let root = insert_module def root parents in
           build_definitions ~root ~definition_base ~reference_base defs
       | None ->
-          let root = Mod.add_mod (definition_module ~root ~reference_base ~name schema) root in
+          let root =
+            Mod.add_mod
+              (definition_module ~root ~reference_base ~name schema)
+              root in
           build_definitions ~root ~definition_base ~reference_base defs)
-  (* XXX ignore schemas that are simply references? just use the referenced module?
-   * in the kubernetes API this seems to be only for deprecated stuff. *)
+  (* XXX Ignore schemas that are simply references? Just use the referenced
+   * module? In the kubernetes API this seems to be only for deprecated
+   * stuff. *)
   | (name, (schema : Swagger_j.schema)) :: defs ->
       build_definitions ~root ~definition_base ~reference_base defs
 
-let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "") ~reference_root s =
+let of_swagger ?(path_base = "")
+               ?(definition_base = "")
+               ?(reference_base = "")
+               ~reference_root s =
   let open Swagger_j in
   let definitions = default [] s.definitions in
   let title = s.info.title in

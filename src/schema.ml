@@ -27,13 +27,21 @@ let rec kind_to_string t =
       | `Object  ->
           let open Swagger_j in
           (match t.raw.additional_properties with
-          | Some props -> sprintf "(string * %s) list" (kind_to_string (create ~reference_base ~reference_root props))
-          | None -> failwith "Schema.kind_to_string: object without additional_properties")
+          | Some props ->
+              sprintf "(string * %s) list"
+                (kind_to_string (create ~reference_base ~reference_root props))
+          | None ->
+              failwith ("Schema.kind_to_string: object without "
+                        ^ "additional_properties"))
       | `Array   ->
           let open Swagger_j in
           match t.raw.items with
-          | Some s -> kind_to_string (create ~reference_base ~reference_root s) ^ " list"
-          | None -> failwith "Schema.kind_to_string: array type must have an 'items' field"
+          | Some s ->
+              let s = create ~reference_base ~reference_root s in
+              kind_to_string s ^ " list"
+          | None ->
+              failwith ("Schema.kind_to_string: array type must have an " ^
+                        "'items' field")
 
 let to_string t =
   let reference_base = t.reference_base in

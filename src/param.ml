@@ -12,7 +12,8 @@ let rec item_kind_to_string (items : Swagger_j.items option) = function
       let open Swagger_j in
       match items with
       | Some is -> item_kind_to_string is.items is.kind ^ " list"
-      | None -> failwith "item_kind_to_string: array type must have an 'items' field"
+      | None -> failwith ("item_kind_to_string: array type must have an "
+                          ^ "'items' field")
 
 let rec kind_to_string (p : t) =
   match some p.kind with
@@ -25,7 +26,8 @@ let rec kind_to_string (p : t) =
       let open Swagger_j in
       match p.items with
       | Some items -> item_kind_to_string items.items items.kind ^ " array"
-      | None -> failwith "Param.kind_to_string: array type must have an 'items' field"
+      | None -> failwith ("Param.kind_to_string: array type must have an "
+                          ^ "'items' field")
 
 let is_keyword = function
   | "object"
@@ -60,8 +62,11 @@ let string_of_location = function
 let create ?(duplicate = false) ~reference_base ~reference_root (p : t) =
   let t =
     match p.location with
-    | `Body -> Schema.to_string (Schema.create ~reference_base ~reference_root (some p.schema))
-    | _     -> kind_to_string p in
+    | `Body ->
+        Schema.create ~reference_base ~reference_root (some p.schema)
+        |> Schema.to_string
+    | _     ->
+        kind_to_string p in
   let n =
     let n = name p.name in
     let loc = string_of_location p.location in
@@ -69,6 +74,7 @@ let create ?(duplicate = false) ~reference_base ~reference_root (p : t) =
     then sprintf "%s_%s" loc n
     else n in
   let descr = p.description in
-  if p.required
-  then (Val.Sig.named ?descr n t, Val.Impl.named n t ~origin:(Val.Impl.origin p))
-  else (Val.Sig.optional ?descr n t, Val.Impl.optional n t ~origin:(Val.Impl.origin p))
+  let create_sig, create_impl =
+    if p.required then Val.Sig.named, Val.Impl.named
+    else Val.Sig.optional, Val.Impl.optional in
+  (create_sig ?descr n t, create_impl n t ~origin:(Val.Impl.origin p))

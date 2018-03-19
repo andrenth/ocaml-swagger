@@ -29,11 +29,14 @@ module Sig = struct
     }
 
   let param_descr = function
-    | Unnamed _ -> None
-    | Named ({ name; descr = Some descr }, _) -> Some (sprintf "%s %s" name descr)
-    | Optional ({ name; descr = Some descr }, _) -> Some (sprintf "%s %s" name descr)
-    | Named ({ descr = None }, _) -> None
-    | Optional ({ descr = None }, _) -> None
+    | Unnamed _
+    | Named ({ descr = None }, _)
+    | Optional ({ descr = None }, _) ->
+        None
+    | Named ({ name; descr = Some descr }, _) ->
+        Some (sprintf "%s %s" name descr)
+    | Optional ({ name; descr = Some descr }, _) ->
+        Some (sprintf "%s %s" name descr)
 
   let create ?descr kind name params return =
     let descr = descr :: List.map param_descr params |> keep_some in
@@ -68,7 +71,8 @@ module Sig = struct
   let params_to_string params =
     let rec go acc = function
       | [] -> acc
-      | [Optional _ as p] -> sprintf "%s%s -> unit -> " acc (param_to_string p) (* extra unit param if last is optional *)
+      (* extra unit param if last one is optional *)
+      | [Optional _ as p] -> sprintf "%s%s -> unit -> " acc (param_to_string p)
       | p :: ps -> go (sprintf "%s%s -> " acc (param_to_string p)) ps in
     go "" params
 
@@ -91,7 +95,8 @@ module Sig = struct
                   |> String.split_on_char ' '
                   |> List.map snake_case
                   |> String.concat " " in
-                 if i = 0 then sprintf "%s(** %s\n" pad (String.capitalize_ascii d)
+                 if i = 0
+                 then sprintf "%s(** %s\n" pad (String.capitalize_ascii d)
                  else sprintf "%s @param %s" comment_pad d)
               descr in
           "\n" ^ String.concat "\n" descr ^ " *)\n" in
@@ -204,20 +209,30 @@ module Impl = struct
 
   let assoc_opt_string =
     let string_of = sprintf "string_of_%s %s" in
-    let string_opt_to_string = sprintf {| match %s with Some s -> s | None -> "" |} in
-    let opt_to_string = sprintf {| match %s with Some x -> string_of_%s x | None -> "" |} in
+    let string_opt_to_string =
+      sprintf {| match %s with Some s -> s | None -> "" |} in
+    let opt_to_string =
+      sprintf {| match %s with Some x -> string_of_%s x | None -> "" |} in
     assoc_string_with
       (fun p ->
         let orig_name, value =
           match p with
-          | Named ({ name; type_ = "string"}, Some origin) -> (origin.orig_name, name)
-          | Named ({ name; type_ }, Some origin) -> (origin.orig_name, string_of type_ name)
-          | Named ({ name; type_ = "string"}, None) -> (name, name)
-          | Named ({ name; type_ }, None) -> (name, string_of type_ name)
-          | Optional ({ name; type_ = "string"}, Some origin) -> (origin.orig_name, string_opt_to_string name)
-          | Optional ({ name; type_ }, Some origin) -> (origin.orig_name, opt_to_string name type_)
-          | Optional ({ name; type_ }, None) -> (name, opt_to_string name type_)
-          | Unnamed _ -> failwith "unnamed parameters don't go in requests" in
+          | Named ({ name; type_ = "string"}, Some origin) ->
+              (origin.orig_name, name)
+          | Named ({ name; type_ }, Some origin) ->
+              (origin.orig_name, string_of type_ name)
+          | Named ({ name; type_ = "string"}, None) ->
+              (name, name)
+          | Named ({ name; type_ }, None) ->
+              (name, string_of type_ name)
+          | Optional ({ name; type_ = "string"}, Some origin) ->
+              (origin.orig_name, string_opt_to_string name)
+          | Optional ({ name; type_ }, Some origin) ->
+              (origin.orig_name, opt_to_string name type_)
+          | Optional ({ name; type_ }, None) ->
+              (name, opt_to_string name type_)
+          | Unnamed _ ->
+              failwith "unnamed parameters don't go in requests" in
         sprintf "(\"%s\", %s)" orig_name value)
 
   let assoc_string =
@@ -275,11 +290,16 @@ module Impl = struct
     params
     |> List.filter (fun p -> param_location p = Some `Header)
     |> function
-       | [] -> "None"
-       | hs -> sprintf {| Some (Header.add_list (Head.init ()) %s) |} (assoc_string hs)
+       | [] ->
+           "None"
+       | hs ->
+           sprintf {| Some (Header.add_list (Head.init ()) %s) |}
+             (assoc_string hs)
 
   let make_body params =
-    let body_params = params |> List.filter (fun p -> param_location p = Some `Header) in
+    let body_params =
+      params
+      |> List.filter (fun p -> param_location p = Some `Header) in
     match body_params with
     | [] -> "None"
     | [p] ->
@@ -291,8 +311,11 @@ module Impl = struct
           |> fst
           |> String.concat "."
           |> sprintf "%s.to_yojson" in
-        sprintf {| Some (Body.of_string (Yojson.to_string (%s %s))) |} to_yojson (param_name p)
-    | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
+        sprintf {| Some (Body.of_string (Yojson.to_string (%s %s))) |}
+          to_yojson
+          (param_name p)
+    | _ ->
+        failwith "Val.Impl.make_body: there can be only one body parameter"
 
   let string_of_http_verb = function
     | Get     -> "get"
@@ -375,7 +398,8 @@ module Impl = struct
     | Http_request (Head, return) -> http_head ~pad ~return t.params
     | Http_request (Patch, return) -> http_patch ~pad ~return t.params
     | Http_request (Options, return) -> http_options ~pad ~return t.params
-    | Derived -> failwith "Val.Impl.body_to_string: derived functions have no body"
+    | Derived ->
+        failwith "Val.Impl.body_to_string: derived functions have no body"
 
   let param_to_string = function
     | Named (p, _) -> sprintf "~%s" p.name

@@ -21,7 +21,12 @@ let module_name s =
   |> String.split_on_char '.'
   |> List.hd
 
-let create ~name ?(recursive = false) ?(path = []) ?(types = []) ?(submodules = StringMap.empty) ?(values = []) () =
+let create ~name
+           ?(recursive = false)
+           ?(path = [])
+           ?(types = [])
+           ?(submodules = StringMap.empty)
+           ?(values = []) () =
   { name = module_name name
   ; path = List.map module_name path
   ; types
@@ -101,8 +106,14 @@ let rec sig_to_string ?(indent = 0) m =
     (if m.recursive then " rec " else " ")
     m.name
     submods
-    (String.concat "\n" (List.map (fun t -> Type.Sig.to_string ~indent:(indent + 2) t.Type.signature) m.types))
-    (String.concat "" (List.map (fun v -> Val.Sig.to_string ~indent:(indent + 2) v.Val.signature) m.values))
+    (String.concat "\n"
+      (List.map
+        (fun t -> Type.Sig.to_string ~indent:(indent + 2) t.Type.signature)
+        m.types))
+    (String.concat ""
+      (List.map
+        (fun v -> Val.Sig.to_string ~indent:(indent + 2) v.Val.signature)
+        m.values))
     pad
 
 let rec impl_to_string ?(indent = 0) m =
@@ -125,8 +136,15 @@ let rec impl_to_string ?(indent = 0) m =
   sprintf "%s= struct\n%s%s%s%send\n"
     decl
     submods
-    (String.concat "\n" (List.map (fun t -> Type.Impl.to_string ~indent:(indent + 2) t.Type.implementation) m.types))
-    (String.concat "" (List.map (fun v -> Val.Impl.to_string ~indent:(indent + 2) v.Val.implementation) m.values))
+    (String.concat "\n"
+      (List.map
+        (fun t ->
+          Type.Impl.to_string ~indent:(indent + 2) t.Type.implementation)
+        m.types))
+    (String.concat ""
+      (List.map
+        (fun v -> Val.Impl.to_string ~indent:(indent + 2) v.Val.implementation)
+        m.values))
     pad
 
 let to_string ?indent m =
@@ -165,5 +183,3 @@ let reference_module ~reference_base ~reference_root ref =
 
 let reference_type ~reference_base ~reference_root ref =
   reference_module ~reference_base ~reference_root ref ^ ".t"
-
-
