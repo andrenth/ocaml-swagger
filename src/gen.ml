@@ -110,10 +110,14 @@ module Val = struct
       | Named of string * string
       | Optional of string * string
 
+    type return =
+      | Simple of string
+      | Async of string
+
     type t =
       { name      : string
       ; params    : param list
-      ; return    : string
+      ; return    : return
       ; kind      : kind
       ; descr     : string option
       }
@@ -125,20 +129,27 @@ module Val = struct
     let unnamed type_ = Unnamed type_
     let optional name type_ = Optional (name, type_)
 
-    let pure = create Pure
+    let pure ?descr name params ret =
+      create ?descr Pure name params (Simple ret)
 
     (* Here "constants" are actually [unit -> string] functions to satisfy
      * OCaml's recusive module safety requirements.
      *
      * See https://stackoverflow.com/q/4239045 *)
-    let constant name = pure name [Unnamed "unit"] "string"
+    let constant ?descr name =
+      pure name [Unnamed "unit"] "string"
 
-    let http_request ?descr = create ?descr Http_request
+    let http_request ?descr name params ret =
+      create ?descr Http_request name params (Async ret)
 
     let param_to_string = function
       | Named (n, t) -> sprintf "%s:%s" n t
       | Unnamed t -> t
       | Optional (n, t) -> sprintf "?%s:%s" n t
+
+    let return_to_string = function
+      | Simple t -> t
+      | Async t -> sprintf "(%s, string) result Lwt.t" t
 
     let params_to_string params =
       let rec go acc = function
@@ -152,23 +163,32 @@ module Val = struct
       let params =
         match kind with
         | Pure -> params
-        | Http_request -> params @ [Named ("uri", "Uri.t")] in
+        | Http_request -> params @ [named "uri" "Uri.t"] in
       let doc =
         match descr with
         | Some d -> sprintf "%s(** %s *)\n" pad d
         | None -> "" in
-      sprintf "%s%sval %s : %s%s\n" doc pad name (params_to_string params) return
+      sprintf "%s%sval %s : %s%s\n"
+        doc
+        pad
+        name
+        (params_to_string params)
+        (return_to_string return)
   end
 
   module Impl = struct
     type http_verb = Get | Put | Post | Delete | Head | Patch | Options
+
+    type return =
+      | Module of string
+      | Type of string
 
     type kind =
       | Record_constructor
       | Record_accessor
       | Identity
       | Constant of string
-      | Http_request of http_verb
+      | Http_request of http_verb * return
       | Derived
 
     type origin =
@@ -210,7 +230,7 @@ module Val = struct
     let record_accessor = create Record_accessor
     let identity = create Identity
     let constant name value = create (Constant value) name [unnamed "()" "unit"]
-    let http_request verb = create (Http_request verb)
+    let http_request ~return verb = create (Http_request (verb, return))
     let derived = create Derived "" []
 
     let param_name = function
@@ -347,22 +367,46 @@ module Val = struct
           sprintf {| Some (Body.of_string (Yojson.to_string (%s %s))) |} to_yojson (param_name p)
       | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
 
-    let build_http_request ~pad ?(body_param = false) ?(response_body = true) ~name params =
+    let string_of_http_verb = function
+      | Get     -> "get"
+      | Put     -> "put"
+      | Post    -> "post"
+      | Delete  -> "delete"
+      | Head    -> "head"
+      | Patch   -> "patch"
+      | Options -> "options"
+
+    let client_function_of_http_verb = function
+      | Options -> "call `OPTIONS"
+      | verb -> string_of_http_verb verb
+
+    let continuation_of_http_verb = function
+      | Head -> "fun resp ->let code = resp |> Response.status |> Code.code_of_status in\nlet body = \"Ok\" in"
+      | _ -> "fun (resp, body) ->\nlet code = resp |> Response.status |> Code.code_of_status in\nBody.to_string body >>= fun body ->"
+
+    let build_http_request ~pad ?(body_param = false) ~return verb params =
+      let client_fun = client_function_of_http_verb verb in
+      let result_cont = continuation_of_http_verb verb in
       let body_param =
-        if body_param then sprintf "?body:(%s) " (make_body params)
+        if body_param
+        then sprintf "?body:(%s) " (make_body params)
         else "" in
       let response_code =
-        if response_body then sprintf {|
-          Client.%s %s?headers uri >>= fun (resp, body) ->
-          let code = resp |> Response.status |> Code.code_of_status in
-          Body.to_string body >>= fun resp ->
-          Lwt.return (if code >= 200 && code < 300 then Ok resp else Error resp)
-        |} name body_param
-        else sprintf {|
-          Client.%s %s?headers uri >>= fun resp ->
-          let code = resp |> Response.status |> Code.code_of_status in
-          Lwt.return (if code >= 200 && code < 300 then Ok (string_of_int code) else Error (string_of_int code))
-        |} name body_param in
+        match return with
+        | Module module_name -> sprintf {|
+          Client.%s %s?headers uri >>= %s
+          let str = Yojson.Safe.from_string body in
+          Lwt.return (if code >= 200 && code < 300 then %s.of_yojson str else Error body)
+        |} client_fun body_param result_cont module_name
+        | Type type_name ->
+            let conv_result = function
+              | "unit"   -> "()"
+              | "string" -> "body"
+              | other    -> sprintf "(%s_of_string body)" other in
+            sprintf {|
+          Client.%s %s?headers uri >>= %s
+          Lwt.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
+        |} client_fun body_param result_cont (conv_result type_name) in
       let code =
         String.trim @@ sprintf {|
           let open Lwt.Infix in
@@ -382,13 +426,13 @@ module Val = struct
       |> List.map (fun l -> sprintf "%s%s" pad (trim_at_most 10 l))
       |> String.concat "\n"
 
-    let http_get     = build_http_request                      ~name:"get"
-    let http_put     = build_http_request ~body_param:true     ~name:"put"
-    let http_post    = build_http_request ~body_param:true     ~name:"post"
-    let http_delete  = build_http_request ~body_param:true     ~name:"delete"
-    let http_head    = build_http_request ~response_body:false ~name:"head"
-    let http_patch   = build_http_request ~body_param:true     ~name:"patch"
-    let http_options = build_http_request                      ~name:"call `OPTIONS"
+    let http_get     ~return = build_http_request                  ~return Get
+    let http_put     ~return = build_http_request ~body_param:true ~return Put
+    let http_post    ~return = build_http_request ~body_param:true ~return Post
+    let http_delete  ~return = build_http_request ~body_param:true ~return Delete
+    let http_head    ~return = build_http_request                  ~return Head
+    let http_patch   ~return = build_http_request ~body_param:true ~return Patch
+    let http_options ~return = build_http_request                  ~return Options
 
     let body_to_string ?(indent = 0) t =
       let pad = String.make indent ' ' in
@@ -397,13 +441,13 @@ module Val = struct
       | Record_accessor -> sprintf "%st.%s" pad t.name
       | Identity -> sprintf "%st" pad
       | Constant v -> sprintf "%s\"%s\"" pad v
-      | Http_request Get -> http_get ~pad t.params
-      | Http_request Put -> http_put ~pad t.params
-      | Http_request Post -> http_post ~pad t.params
-      | Http_request Delete -> http_delete ~pad t.params
-      | Http_request Head -> http_head ~pad t.params
-      | Http_request Patch -> http_patch ~pad t.params
-      | Http_request Options -> http_options ~pad t.params
+      | Http_request (Get, return) -> http_get ~pad ~return t.params
+      | Http_request (Put, return) -> http_put ~pad ~return t.params
+      | Http_request (Post, return) -> http_post ~pad ~return t.params
+      | Http_request (Delete, return) -> http_delete ~pad ~return t.params
+      | Http_request (Head, return) -> http_head ~pad ~return t.params
+      | Http_request (Patch, return) -> http_patch ~pad ~return t.params
+      | Http_request (Options, return) -> http_options ~pad ~return t.params
       | Derived -> failwith "Val.Impl.body_to_string: derived functions have no body"
 
     let param_to_string = function
@@ -629,6 +673,9 @@ module Schema = struct
   let create ~reference_base ~reference_root raw =
     { raw; reference_base; reference_root }
 
+  let reference t =
+    t.raw.ref
+
   let rec kind_to_string t =
     let reference_base = t.reference_base in
     let reference_root = t.reference_root in
@@ -737,16 +784,23 @@ let operation_params = function
   | None, Some ps -> ps
   | Some ps, Some ps' -> merge_params ps ps'
 
-let resp_type ~reference_base ~reference_root (resp : Swagger_j.response_or_reference) =
-  let ref_type = reference_type ~reference_base ~reference_root in
-  match resp.ref with
-  | Some r -> ref_type r
-  | None ->
-      match resp.schema with
-      | Some s -> Schema.create ~reference_base ~reference_root s |> Schema.to_string
-      | None -> "unit"
+let reference_module_and_type ~reference_base ~reference_root r =
+  let ref_module = reference_module ~reference_base ~reference_root r in
+  let ref_type = sprintf "%s.t" ref_module in
+  (Some ref_module, ref_type)
 
-let rec return_type ~root ~base resps =
+let resp_type ~reference_base ~reference_root (resp : Swagger_j.response_or_reference) =
+  match resp.ref, resp.schema with
+  | None, None -> (None, "unit")
+  | Some _, Some _ -> failwith "response cannot be a reference and a schema simultaneously"
+  | Some r, None -> reference_module_and_type ~reference_base ~reference_root r
+  | None, Some s ->
+      let s = Schema.create ~reference_base ~reference_root s in
+      match Schema.reference s with
+      | Some r -> reference_module_and_type ~reference_base ~reference_root r
+      | None -> (None, Schema.to_string s)
+
+let rec return_type ~reference_root ~reference_base resps =
   let is_error code =
     let code = int_of_string code in
     code < 200 || code >= 300 in
@@ -755,11 +809,9 @@ let rec return_type ~root ~base resps =
     | Some s1, Some s2 -> s1 = s2
     | _ -> false in
   match resps with
-  | [] ->
-(*       "unit" (* XXX error? *) *)
-      "(string, string) result Lwt.t"
+  | [] -> None, "unit"
   | (code, _)::rs when is_error code ->
-      return_type ~root ~base rs (* ignore errors; assume strings *)
+      return_type ~reference_root ~reference_base rs (* ignore errors; assume strings *)
   | (_code, resp)::rs ->
       (* check all 2xx responses return the same type *)
       let rec check first = function
@@ -768,8 +820,8 @@ let rec return_type ~root ~base resps =
         | (_code', resp')::rs when responses_match first resp' -> check first rs
         | (c, (r:Swagger_j.response_or_reference))::_ -> failwith @@ sprintf "multiple response types are not supported: %s - %s" (Swagger_j.string_of_response_or_reference resp) (Swagger_j.string_of_response_or_reference r) in
       check resp rs;
-(* XXX sprintf "(%s, string) result" (resp_type ~root ~base resp) *)
-      "(string, string) result Lwt.t"
+      resp_type ~reference_base ~reference_root resp
+(*       "(string, string) result Lwt.t" *)
 
 let make_dups params =
   List.fold_left
@@ -792,10 +844,14 @@ let operation_val ~root ~reference_base ~reference_root name params = function
                Param.create ~duplicate ~reference_base ~reference_root p)
         |> List.split in
       (* TODO op.responses *)
-      let ret = return_type ~root ~base:reference_base op.responses in
+      let return_module, return_type = return_type ~reference_root ~reference_base op.responses in
       let verb = Val.Impl.http_verb_of_string name in
-      let signature = Val.Sig.http_request ?descr:op.description name param_sigs ret in
-      let implementation = Val.Impl.http_request verb name param_impls in
+      let signature = Val.Sig.http_request ?descr:op.description name param_sigs return_type in
+      let return =
+        match return_module with
+        | Some module_name -> Val.Impl.Module module_name
+        | None -> Val.Impl.Type return_type in
+      let implementation = Val.Impl.http_request verb name param_impls ~return in
       Some (Val.create signature implementation)
   | None ->
       None
