@@ -10,7 +10,7 @@
   (deps    (swagger.atd))
   (action  (run atdgen -t ${<}))))
 
-(executable
+(library
  ((name swagger)
   (public_name swagger)
   (libraries (atdgen re.pcre yojson))))
