@@ -12,8 +12,8 @@ module Sig = struct
     let pad = String.make indent ' ' in
     let name, attr =
       match t with
-      | Abstract name -> name, " [@@deriving yojson]\n"
-      | Phantom name -> name, "" in
+      | Abstract name -> name, " [@@deriving yojson]"
+      | Phantom name -> name, " [@@deriving yojson]" in
     sprintf "%stype %s%s\n" pad name attr
 end
 
@@ -37,7 +37,7 @@ module Impl = struct
     let pad = String.make indent ' ' in
     match t with
     | Phantom name ->
-        sprintf "%stype %s\n" pad name
+        sprintf "%stype %s = () [@@deriving yojson]\n" pad name
     | Alias (name, target) ->
         sprintf "%stype %s = %s [@@deriving yojson]\n" pad name target
     | Record (name, fields) ->
