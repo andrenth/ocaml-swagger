@@ -544,8 +544,8 @@ module Mod = struct
       if s.[0] = '{' && s.[last] = '}' then "By_" ^ String.sub s 1 (last - 1)
       else s in
     s
+    |> snake_case
     |> String.capitalize_ascii
-    |> String.map (fun c -> if c = '-' then '_' else c)
     |> String.split_on_char '.'
     |> List.hd
 
