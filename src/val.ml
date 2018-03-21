@@ -280,7 +280,7 @@ module Impl = struct
           let path_params = %s in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re_pcre.regexp (sprintf "\\{%%s\\}" name) in
+              let re = Re.Pcre.regexp (sprintf "\\{%%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ())
             path_params
