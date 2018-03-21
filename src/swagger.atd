@@ -199,42 +199,7 @@ type responses_definitions = (string * response) list <json repr="object">
 
 type reference <ocaml valid="Swagger_util.Validate.url"> = string
 
-type parameter_or_reference =
-  { name : string
-  ; location <json name="in"> : location
-  ; ?description : string option
-  ; ~required <ocaml default="false"> : bool
-  ; ?schema : schema option
-  ; ?kind <json name="type"> : kind option
-  ; ?format : string option
-  ; ~allow_empty_value <json name="allowEmptyValue"> <ocaml default="false"> : bool
-  ; ?items : items option
-  ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
-  ; ?default : json option
-  ; ?maximum : int option
-  ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
-  ; ?minimum : int option
-  ; ?exclusive_minimum <json name="exclusiveMinimum"> : bool option
-  ; ?max_length <json name="maxLength"> : int option
-  ; ?min_length <json name="minLength"> : int option
-  ; ?pattern : string option
-  ; ?max_items <json name="maxItems"> : int option
-  ; ?min_items <json name="minItems"> : int option
-  ; ?unique_items <json name="uniqueItems"> : bool option
-  ; ?enum : json list option
-  ; ?multiple_of <json name="multipleOf"> : int option
-  ; ?ref <json name="$ref"> : reference option
-  }
-
-type response_or_reference =
-  { ?description : string option
-  ; ?schema : schema option
-  ; ?headers : headers option
-  ; ?examples : example option
-  ; ?ref <json name="$ref"> : reference option
-  }
-
-type responses = (string * response_or_reference) list <json repr="object">
+type responses = (string * json) list <json repr="object">
 
 type operation =
   { ?tags : string list option
@@ -244,7 +209,7 @@ type operation =
   ; ?operation_id <json name="operationId"> : string option
   ; ?consumes : string list option (* validate mime? *)
   ; ?produces : string list option (* validate mime? *)
-  ; ?parameters : parameter_or_reference list option
+  ; ?parameters : json list option
   ; responses : responses
   ; ?schemes : scheme list option
   ; ~deprecated <ocaml default="false"> : bool
@@ -260,7 +225,7 @@ type path_item =
   ; ?options : operation option
   ; ?head : operation option
   ; ?patch : operation option
-  ; ?parameters : parameter_or_reference list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
+  ; ?parameters : json list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
   }
 
 type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">

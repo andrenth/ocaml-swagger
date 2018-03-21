@@ -138,7 +138,7 @@ module Impl = struct
     | Unnamed of param_data
     | Optional of param_data * origin option
 
-  let origin (p : Swagger_j.parameter_or_reference) =
+  let origin (p : Swagger_j.parameter) =
     { location = p.location; orig_name = p.name }
 
   let named ?origin name type_ =

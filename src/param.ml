@@ -1,7 +1,7 @@
 open Printf
 open Util
 
-type t = Swagger_j.parameter_or_reference
+type t = Swagger_j.parameter
 
 let rec item_kind_to_string (items : Swagger_j.items option) = function
   | `String  -> "string"

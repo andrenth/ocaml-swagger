@@ -10,55 +10,67 @@ module StringSet = Set.Make (struct
   let compare = compare
 end)
 
-let merge_params (ps1 : Swagger_j.parameter_or_reference list)
-                 (ps2 : Swagger_j.parameter_or_reference list) =
-  let open Swagger_j in
+type parameter_or_reference =
+  [ `Parameter of Swagger_j.parameter
+  | `Reference of Swagger_j.reference
+  ]
+
+type response_or_reference =
+  [ `Response of Swagger_j.response
+  | `Reference of Swagger_j.reference
+  ]
+
+let merge_params (ps1 : Swagger_j.parameter list)
+                 (ps2 : Swagger_j.parameter list) =
   let rec merge acc = function
     | [] -> acc
-    | (p : Swagger_j.parameter_or_reference)::ps ->
-        let same_name (q : Swagger_j.parameter_or_reference) =
+    | (p : Swagger_j.parameter)::ps ->
+        let same_name (q : Swagger_j.parameter) =
+          let open Swagger_j in
           p.name = q.name in
         if List.exists same_name acc
         then merge acc ps
         else merge (p::acc) ps in
   merge ps2 ps1
 
-let operation_params = function
-  | None, None -> []
-  | Some ps, None -> ps
-  | None, Some ps -> ps
-  | Some ps, Some ps' -> merge_params ps ps'
-
 let reference_module_and_type ~reference_base ~reference_root r =
   let ref_module = Mod.reference_module ~reference_base ~reference_root r in
   let ref_type = sprintf "%s.t" ref_module in
   (Some ref_module, ref_type)
 
-let resp_type ~reference_base
-              ~reference_root
-              (resp : Swagger_j.response_or_reference) =
-  match resp.ref, resp.schema with
-  | None, None ->
-      (None, "unit")
-  | Some _, Some _ ->
-      failwith "response cannot be a reference and a schema simultaneously"
-  | Some r, None ->
-      reference_module_and_type ~reference_base ~reference_root r
-  | None, Some s ->
+let parse_or_reference f json =
+  let open Yojson.Basic.Util in
+  let str = Yojson.Safe.to_string json in
+  match json |> Yojson.Safe.to_basic |> member "$ref" with
+  | `Null -> f str
+  | _ -> failwith "reference not supported"
+
+let parse_parameters = function
+  | Some ps -> List.map (parse_or_reference Swagger_j.parameter_of_string) ps
+  | None -> []
+
+let parse_response r =
+  parse_or_reference Swagger_j.response_of_string r
+
+let parse_responses =
+  List.map (fun (s, r) -> (s, parse_response r))
+
+let resp_type ~reference_base ~reference_root (resp : Swagger_j.response) =
+  match resp.schema with
+  | None -> (None, "unit")
+  | Some s ->
       let s = Schema.create ~reference_base ~reference_root s in
       match Schema.reference s with
       | Some r -> reference_module_and_type ~reference_base ~reference_root r
       | None -> (None, Schema.to_string s)
 
-let rec return_type ~reference_root ~reference_base resps =
+let rec return_type ~reference_root ~reference_base (resps : Swagger_j.responses) =
   let is_error code =
     let code = int_of_string code in
     code < 200 || code >= 300 in
-  let responses_match (r1 : Swagger_j.response_or_reference)
-                      (r2 : Swagger_j.response_or_reference) =
-    match r1.schema, r2.schema with
-    | Some s1, Some s2 -> s1 = s2
-    | _ -> false in
+  let responses_match (r1 : Swagger_j.response)
+                      (r2 : Swagger_j.response) =
+    r1.schema = r2.schema in
   match resps with
   | [] -> None, "unit"
   | (code, _)::rs when is_error code ->
@@ -73,31 +85,30 @@ let rec return_type ~reference_root ~reference_base resps =
             check first res
         | (_code', resp')::rs when responses_match first resp' ->
             check first rs
-        | (c, (r:Swagger_j.response_or_reference))::_ ->
-            failwith @@
-              sprintf "multiple response types are not supported: %s - %s"
-                (Swagger_j.string_of_response_or_reference resp)
-                (Swagger_j.string_of_response_or_reference r) in
-      check resp rs;
+        | (c, (r : Swagger_j.response))::_ ->
+            failwith "multiple response types are not supported" in
+      let resp = parse_response resp in
+      check resp (parse_responses rs);
       resp_type ~reference_base ~reference_root resp
 
 let make_dups params =
   List.fold_left
-    (fun dups (p : Swagger_j.parameter_or_reference) ->
+    (fun dups (p : Swagger_j.parameter) ->
       match StringMap.find_opt p.name dups with
       | Some count -> StringMap.add p.name (count + 1) dups
       | None -> StringMap.add p.name 1 dups)
     StringMap.empty
     params
 
-let operation_val ~root ~reference_base ~reference_root name params = function
+let operation_val ~root ~reference_base ~reference_root name (params : Swagger_j.parameter list) = function
   | Some (op : Swagger_j.operation) ->
-      let params = operation_params (params, op.parameters) in
+      let op_params = parse_parameters op.parameters in
+      let params = merge_params params op_params in
       let dups = make_dups params in
       let param_sigs, param_impls =
         params
         |> List.map
-             (fun (p : Swagger_j.parameter_or_reference) ->
+             (fun (p : Swagger_j.parameter) ->
                let duplicate = StringMap.find p.name dups > 1 in
                Param.create ~duplicate ~reference_base ~reference_root p)
         |> List.split in
@@ -123,8 +134,9 @@ let path_val path =
     (Val.Impl.constant "request_path_template" path)
 
 let path_item_vals ~root ~reference_base ~reference_root ~path (item : Swagger_j.path_item) : Val.t list =
+  let params = parse_parameters item.parameters in
   let operation_val name =
-    operation_val ~root ~reference_base ~reference_root name item.parameters in
+    operation_val ~root ~reference_base ~reference_root name params in
   let get     = operation_val "get"     item.get in
   let put     = operation_val "put"     item.put in
   let post    = operation_val "post"    item.post in
