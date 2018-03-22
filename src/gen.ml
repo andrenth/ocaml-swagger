@@ -193,15 +193,17 @@ let definition_module ?(path = [])
     let fields, values =
       List.fold_left
         (fun (fields, values) (name, schema) ->
-          let opt = if List.mem name required then "" else " option" in
           let s = Schema.create ~reference_base ~reference_root:root schema in
-          let ret = sprintf "%s%s" (Schema.to_string s) opt in
+          let s = Schema.to_string s in
+          let type_ =
+            let req = List.mem name required in
+            sprintf (if req then "%s" else "(%s option [@default None])") s in
           let pname = Param.name name in
           let field =
-            Type.Impl.{ name = pname; orig_name = name; type_ = ret } in
+            Type.Impl.{ name = pname; orig_name = name; type_ } in
           let value =
             Val.create
-              (Val.Sig.pure pname [Val.Sig.Unnamed "t"] ret)
+              (Val.Sig.pure pname [Val.Sig.Unnamed "t"] type_)
               (Val.Impl.record_accessor pname [Val.Impl.unnamed "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])
