@@ -12,8 +12,8 @@ module Sig = struct
     }
 
   type param =
-    | Unnamed of string
     | Named of param_data * string
+    | Positional of string
     | Optional of param_data * string
 
   type return =
@@ -29,7 +29,7 @@ module Sig = struct
     }
 
   let param_descr = function
-    | Unnamed _
+    | Positional _
     | Named ({ descr = None }, _)
     | Optional ({ descr = None }, _) ->
         None
@@ -43,7 +43,7 @@ module Sig = struct
     { name; params; return; kind; descr }
 
   let named ?descr name type_ = Named ({ name; descr }, type_)
-  let unnamed type_ = Unnamed type_
+  let positional type_ = Positional type_
   let optional ?descr name type_ = Optional ({ name; descr }, type_)
 
   let pure ?descr name params ret =
@@ -54,14 +54,14 @@ module Sig = struct
    *
    * See https://stackoverflow.com/q/4239045 *)
   let constant ?descr name =
-    pure name [Unnamed "unit"] "string"
+    pure name [Positional "unit"] "string"
 
   let http_request ?descr name params ret =
     create ?descr Http_request name params (Async ret)
 
   let param_to_string = function
     | Named ({ name }, type_) -> sprintf "%s:%s" name type_
-    | Unnamed type_ -> type_
+    | Positional type_ -> type_
     | Optional ({ name }, type_) -> sprintf "?%s:%s" name type_
 
   let return_to_string = function
@@ -135,7 +135,7 @@ module Impl = struct
 
   type param =
     | Named of param_data * origin option
-    | Unnamed of param_data
+    | Positional of param_data
     | Optional of param_data * origin option
 
   let origin (p : Swagger_j.parameter) =
@@ -144,8 +144,8 @@ module Impl = struct
   let named ?origin name type_ =
     Named ({ name; type_ }, origin)
 
-  let unnamed name type_ =
-    Unnamed { name; type_ }
+  let positional name type_ =
+    Positional { name; type_ }
 
   let optional ?origin name type_ =
     Optional ({ name; type_ }, origin)
@@ -161,27 +161,28 @@ module Impl = struct
   let record_constructor = create Record_constructor
   let record_accessor = create Record_accessor
   let identity = create Identity
-  let constant name value = create (Constant value) name [unnamed "()" "unit"]
+  let constant name value =
+    create (Constant value) name [positional "()" "unit"]
   let http_request ~return verb = create (Http_request (verb, return))
   let derived = create Derived "" []
 
   let param_name = function
-    | Named (p, _) | Unnamed p | Optional (p, _) -> p.name
+    | Named (p, _) | Positional p | Optional (p, _) -> p.name
 
   let param_type = function
-    | Named (p, _) | Unnamed p | Optional (p, _) -> p.type_
+    | Named (p, _) | Positional p | Optional (p, _) -> p.type_
 
   let param_orig_name = function
     | Named (_, Some origin) -> Some origin.orig_name
     | Optional (_, Some origin) -> Some origin.orig_name
-    | Named (_, None) | Optional (_, None) | Unnamed _ -> None
+    | Named (_, None) | Optional (_, None) | Positional _ -> None
 
   let param_location = function
     | Named (_, Some origin) -> Some origin.location
     | Named (_, None) -> None
     | Optional (_, Some origin) -> Some origin.location
     | Optional (_, None) -> None
-    | Unnamed _ -> None
+    | Positional _ -> None
 
   let is_optional = function
     | Optional _ -> true
@@ -231,8 +232,8 @@ module Impl = struct
               (origin.orig_name, opt_to_string name type_)
           | Optional ({ name; type_ }, None) ->
               (name, opt_to_string name type_)
-          | Unnamed _ ->
-              failwith "unnamed parameters don't go in requests" in
+          | Positional _ ->
+              failwith "positional parameters don't go in requests" in
         sprintf "(\"%s\", %s)" orig_name value)
 
   let assoc_string =
@@ -403,7 +404,7 @@ module Impl = struct
 
   let param_to_string = function
     | Named (p, _) -> sprintf "~%s" p.name
-    | Unnamed p -> p.name
+    | Positional p -> p.name
     | Optional (p, _) -> sprintf "?%s" p.name
 
   let params_to_string params =

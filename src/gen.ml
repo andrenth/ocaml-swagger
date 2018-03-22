@@ -179,8 +179,8 @@ let definition_module ?(path = [])
         (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
-        (Val.Sig.(pure "create" [unnamed param_type] "t"))
-        (Val.Impl.(identity "create" [unnamed "t" "t"])) in
+        (Val.Sig.(pure "create" [positional param_type] "t"))
+        (Val.Impl.(identity "create" [positional "t" "t"])) in
     ([typ], [create]) in
 
   let record_type () =
@@ -203,8 +203,8 @@ let definition_module ?(path = [])
             Type.Impl.{ name = pname; orig_name = name; type_ } in
           let value =
             Val.create
-              (Val.Sig.pure pname [Val.Sig.Unnamed "t"] type_)
-              (Val.Impl.record_accessor pname [Val.Impl.unnamed "t" "t"]) in
+              (Val.Sig.pure pname [Val.Sig.positional "t"] type_)
+              (Val.Impl.record_accessor pname [Val.Impl.positional "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])
         properties in
