@@ -81,7 +81,7 @@ module Sig = struct
     let params =
       match kind with
       | Pure -> params
-      | Http_request -> params @ [named "uri" "Uri.t"] in
+      | Http_request -> params @ [positional "Uri.t"] in
     let doc =
       match descr with
       | [] -> ""
@@ -418,7 +418,7 @@ module Impl = struct
     let pad = String.make indent ' ' in
     let params =
       match kind with
-      | Http_request _ -> params @ [named "uri" "Uri.t"]
+      | Http_request _ -> params @ [positional "uri" "Uri.t"]
       | _ -> params in
     match kind with
     | Derived -> ""
