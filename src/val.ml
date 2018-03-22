@@ -345,8 +345,8 @@ module Impl = struct
       match return with
       | Module module_name -> sprintf {|
         Client.%s %s?headers uri >>= %s
-        let str = Yojson.Safe.from_string body in
-        Lwt.return (if code >= 200 && code < 300 then %s.of_yojson str else Error body)
+        let json = Yojson.Safe.from_string body in
+        Lwt.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
       |} client_fun body_param result_cont module_name
       | Type type_name ->
           let conv_result = function
