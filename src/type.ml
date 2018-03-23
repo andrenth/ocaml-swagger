@@ -29,6 +29,9 @@ module Impl = struct
     | Record of string * record_field list
     | Phantom of string
 
+  let record_field ~name ~orig_name ~type_ =
+    { name; orig_name; type_ }
+
   let alias name target = Alias (name, target)
   let record name fields = Record (name, fields)
   let phantom name = Phantom name
@@ -63,3 +66,9 @@ let create signature implementation = { signature; implementation }
 let name t =
   match t.signature with
   | Abstract n | Phantom n -> n
+
+let signature t =
+  t.signature
+
+let implementation t =
+  t.implementation

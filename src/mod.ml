@@ -120,11 +120,11 @@ let rec sig_to_string ?(indent = 0) m =
     submods
     (String.concat "\n"
       (List.map
-        (fun t -> Type.Sig.to_string ~indent t.Type.signature)
+        (fun t -> Type.Sig.to_string ~indent (Type.signature t))
         m.types))
     (String.concat ""
       (List.map
-        (fun v -> Val.Sig.to_string ~indent v.Val.signature)
+        (fun v -> Val.Sig.to_string ~indent (Val.signature v))
         m.values))
     (if has_type_named "t" m then object_module_val ~indent () else "")
     pad
@@ -153,11 +153,11 @@ let rec impl_to_string ?(indent = 0) m =
     (String.concat "\n"
       (List.map
         (fun t ->
-          Type.Impl.to_string ~indent t.Type.implementation)
+          Type.Impl.to_string ~indent (Type.implementation t))
         m.types))
     (String.concat ""
       (List.map
-        (fun v -> Val.Impl.to_string ~indent v.Val.implementation)
+        (fun v -> Val.Impl.to_string ~indent (Val.implementation v))
         m.values))
     (if has_type_named "t" m then object_module_impl ~indent () else "")
     pad

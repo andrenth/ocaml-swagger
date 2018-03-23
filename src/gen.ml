@@ -120,8 +120,8 @@ let operation_val ~root ~reference_base ~reference_root name (params : Swagger_j
         Val.Sig.http_request ?descr name param_sigs return_type in
       let return =
         match return_module with
-        | Some module_name -> Val.Impl.Module module_name
-        | None -> Val.Impl.Type return_type in
+        | Some module_name -> Val.Impl.module_ module_name
+        | None -> Val.Impl.type_ return_type in
       let implementation =
         Val.Impl.http_request verb name param_impls ~return in
       Some (Val.create signature implementation)
@@ -204,7 +204,10 @@ let definition_module ?(path = [])
               (type_, sprintf "(%s [@default None])" type_) in
           let pname = Param.name name in
           let field =
-            Type.Impl.{ name = pname; orig_name = name; type_ = impl_type } in
+            Type.Impl.record_field
+              ~name:pname
+              ~orig_name:name
+              ~type_:impl_type in
           let value =
             Val.create
               (Val.Sig.pure pname [Val.Sig.positional "t"] sig_type)

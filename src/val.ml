@@ -53,7 +53,7 @@ module Sig = struct
    * OCaml's recusive module safety requirements.
    *
    * See https://stackoverflow.com/q/4239045 *)
-  let constant ?descr name =
+  let constant name =
     pure name [Positional "unit"] "string"
 
   let http_request ?descr name params ret =
@@ -137,6 +137,9 @@ module Impl = struct
     | Named of param_data * origin option
     | Positional of param_data
     | Optional of param_data * origin option
+
+  let module_ name = Module name
+  let type_ name = Type name
 
   let origin (p : Swagger_j.parameter) =
     { location = p.location; orig_name = p.name }
@@ -415,7 +418,7 @@ module Impl = struct
       | p::ps -> go (sprintf "%s%s " acc (param_to_string p)) ps in
     go "" params
 
-  let to_string ?uri ?(indent = 0) ({ kind; name; params } as value) =
+  let to_string ?(indent = 0) ({ kind; name; params } as value) =
     let pad = String.make indent ' ' in
     let params =
       match kind with
@@ -437,3 +440,9 @@ type t =
   }
 
 let create signature implementation = { signature; implementation }
+
+let signature t =
+  t.signature
+
+let implementation t =
+  t.implementation
