@@ -300,7 +300,7 @@ module Impl = struct
   let make_body params =
     let body_params =
       params
-      |> List.filter (fun p -> param_location p = Some `Header) in
+      |> List.filter (fun p -> param_location p = Some `Body) in
     match body_params with
     | [] -> "None"
     | [p] ->
