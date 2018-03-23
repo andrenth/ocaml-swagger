@@ -312,7 +312,7 @@ module Impl = struct
           |> fst
           |> String.concat "."
           |> sprintf "%s.to_yojson" in
-        sprintf {| Some (Body.of_string (Yojson.to_string (%s %s))) |}
+        sprintf {| Some (Body.of_string (Yojson.Safe.to_string (%s %s))) |}
           to_yojson
           (param_name p)
     | _ ->
