@@ -89,6 +89,14 @@ let qualified_name m =
 let qualified_path m =
   m.path @ [m.name]
 
+let object_module_val ?(indent = 0) () =
+  let pad = String.make indent ' ' in
+  pad ^ "module Object : Object.S with type value := t\n"
+
+let object_module_impl ?(indent = 0) () =
+  let pad = String.make indent ' ' in
+  pad ^ "module Object = Object.Make (struct type value = t [@@deriving yojson] end)\n"
+
 let rec sig_to_string ?(indent = 0) m =
   let pad = String.make indent ' ' in
   let submods =
@@ -101,7 +109,7 @@ let rec sig_to_string ?(indent = 0) m =
            if name = "Definitions" then s ^ acc
            else acc ^ s)
          "" in
-  sprintf "%smodule%s%s : sig\n%s%s%s%send\n"
+  sprintf "%smodule%s%s : sig\n%s%s%s%s%send\n"
     pad
     (if m.recursive then " rec " else " ")
     m.name
@@ -114,6 +122,7 @@ let rec sig_to_string ?(indent = 0) m =
       (List.map
         (fun v -> Val.Sig.to_string ~indent:(indent + 2) v.Val.signature)
         m.values))
+    (if List.exists (fun t -> Type.name t = "t") m.types then object_module_val ~indent:(indent + 2) () else "")
     pad
 
 let rec impl_to_string ?(indent = 0) m =
@@ -133,7 +142,7 @@ let rec impl_to_string ?(indent = 0) m =
     then ""
     else sprintf "%smodule %s " pad m.name in
 
-  sprintf "%s= struct\n%s%s%s%send\n"
+  sprintf "%s= struct\n%s%s%s%s%send\n"
     decl
     submods
     (String.concat "\n"
@@ -145,6 +154,7 @@ let rec impl_to_string ?(indent = 0) m =
       (List.map
         (fun v -> Val.Impl.to_string ~indent:(indent + 2) v.Val.implementation)
         m.values))
+    (if List.exists (fun t -> Type.name t = "t") m.types then object_module_impl ~indent:(indent + 2) () else "")
     pad
 
 let to_string ?indent m =

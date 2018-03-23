@@ -59,3 +59,7 @@ type t =
   }
 
 let create signature implementation = { signature; implementation }
+
+let name t =
+  match t.signature with
+  | Abstract n | Phantom n -> n
