@@ -312,9 +312,10 @@ module Impl = struct
           |> fst
           |> String.concat "."
           |> sprintf "%s.to_yojson" in
-        sprintf {| Some (Body.of_string (Yojson.Safe.to_string (%s %s))) |}
-          to_yojson
-          (param_name p)
+        String.trim @@
+          sprintf {| Some (Body.of_string (Yojson.Safe.to_string (%s %s))) |}
+            to_yojson
+            (param_name p)
     | _ ->
         failwith "Val.Impl.make_body: there can be only one body parameter"
 
