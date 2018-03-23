@@ -195,15 +195,19 @@ let definition_module ?(path = [])
         (fun (fields, values) (name, schema) ->
           let s = Schema.create ~reference_base ~reference_root:root schema in
           let s = Schema.to_string s in
-          let type_ =
-            let req = List.mem name required in
-            sprintf (if req then "%s" else "(%s option [@default None])") s in
+          let sig_type, impl_type =
+            if List.mem name required then
+              let type_ = sprintf "%s" s in
+              (type_, type_)
+            else
+              let type_ = sprintf "%s option" s in
+              (type_, sprintf "(%s [@default None])" type_) in
           let pname = Param.name name in
           let field =
-            Type.Impl.{ name = pname; orig_name = name; type_ } in
+            Type.Impl.{ name = pname; orig_name = name; type_ = impl_type } in
           let value =
             Val.create
-              (Val.Sig.pure pname [Val.Sig.positional "t"] type_)
+              (Val.Sig.pure pname [Val.Sig.positional "t"] sig_type)
               (Val.Impl.record_accessor pname [Val.Impl.positional "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])
