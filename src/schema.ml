@@ -28,8 +28,13 @@ let rec kind_to_string t =
           let open Swagger_j in
           (match t.raw.additional_properties with
           | Some props ->
-              sprintf "(string * %s) list"
-                (kind_to_string (create ~reference_base ~reference_root props))
+              (match props.ref, props.kind with
+              | Some r, _ -> sprintf "%s.Object.t" (Mod.reference_module ~reference_base ~reference_root r)
+              | None, Some `String -> "Object.Of_strings.t"
+              | None, Some `Number -> "Object.Of_floats.t"
+              | None, Some `Integer -> "Object.Of_ints.t"
+              | None, Some `Boolean -> "Object.Of_bools.t"
+              | None, _ -> sprintf "(string * %s) list" (kind_to_string (create ~reference_base ~reference_root props)))
           | None ->
               failwith ("Schema.kind_to_string: object without "
                         ^ "additional_properties"))
