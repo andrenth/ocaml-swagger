@@ -89,6 +89,9 @@ let qualified_name m =
 let qualified_path m =
   m.path @ [m.name]
 
+let has_type_named n m =
+  List.exists (fun t -> Type.name t = n) m.types
+
 let object_module_val ?(indent = 0) () =
   let pad = String.make indent ' ' in
   pad ^ "module Object : Object.S with type value := t\n"
@@ -109,6 +112,7 @@ let rec sig_to_string ?(indent = 0) m =
            if name = "Definitions" then s ^ acc
            else acc ^ s)
          "" in
+  let indent = indent + 2 in
   sprintf "%smodule%s%s : sig\n%s%s%s%s%send\n"
     pad
     (if m.recursive then " rec " else " ")
@@ -116,13 +120,13 @@ let rec sig_to_string ?(indent = 0) m =
     submods
     (String.concat "\n"
       (List.map
-        (fun t -> Type.Sig.to_string ~indent:(indent + 2) t.Type.signature)
+        (fun t -> Type.Sig.to_string ~indent t.Type.signature)
         m.types))
     (String.concat ""
       (List.map
-        (fun v -> Val.Sig.to_string ~indent:(indent + 2) v.Val.signature)
+        (fun v -> Val.Sig.to_string ~indent v.Val.signature)
         m.values))
-    (if List.exists (fun t -> Type.name t = "t") m.types then object_module_val ~indent:(indent + 2) () else "")
+    (if has_type_named "t" m then object_module_val ~indent () else "")
     pad
 
 let rec impl_to_string ?(indent = 0) m =
@@ -142,19 +146,20 @@ let rec impl_to_string ?(indent = 0) m =
     then ""
     else sprintf "%smodule %s " pad m.name in
 
+  let indent = indent + 2 in
   sprintf "%s= struct\n%s%s%s%s%send\n"
     decl
     submods
     (String.concat "\n"
       (List.map
         (fun t ->
-          Type.Impl.to_string ~indent:(indent + 2) t.Type.implementation)
+          Type.Impl.to_string ~indent t.Type.implementation)
         m.types))
     (String.concat ""
       (List.map
-        (fun v -> Val.Impl.to_string ~indent:(indent + 2) v.Val.implementation)
+        (fun v -> Val.Impl.to_string ~indent v.Val.implementation)
         m.values))
-    (if List.exists (fun t -> Type.name t = "t") m.types then object_module_impl ~indent:(indent + 2) () else "")
+    (if has_type_named "t" m then object_module_impl ~indent () else "")
     pad
 
 let to_string ?indent m =
