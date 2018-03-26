@@ -99,7 +99,7 @@ module Sig = struct
                  then sprintf "%s(** %s\n" pad (String.capitalize_ascii d)
                  else sprintf "%s @param %s" comment_pad d)
               descr in
-          "\n" ^ String.concat "\n" descr ^ " *)\n" in
+          String.concat "\n" descr ^ " *)\n" in
     sprintf "%s%sval %s : %s%s\n"
       doc
       pad

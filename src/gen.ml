@@ -165,7 +165,8 @@ let definition_module ?(path = [])
       (fun params (name, schema) ->
         let s = Schema.create ~reference_base ~reference_root:root schema in
         let param_type = Schema.to_string s in
-        let param_sig, param_impl = create_param name param_type required in
+        let param_sig, param_impl =
+          create_param name param_type required in
         (param_sig, param_impl) :: params)
       [] in
 
