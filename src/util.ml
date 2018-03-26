@@ -31,6 +31,15 @@ let snake_case =
     else
       s
 
+let format_comment =
+  let re = Re.Pcre.regexp "[{}@\[\]]" in
+  fun text ->
+    text
+    |> Re.replace re ~f:(fun g -> "\\" ^ Re.Group.get g 0)
+    |> String.split_on_char ' '
+    |> List.map snake_case
+    |> String.concat " "
+
 let unsnoc l =
   let rec go acc = function
     | [] -> None

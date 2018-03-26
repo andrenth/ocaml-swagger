@@ -90,14 +90,10 @@ module Sig = struct
           let descr =
             List.mapi
               (fun i d ->
-                let d =
-                  d
-                  |> String.split_on_char ' '
-                  |> List.map snake_case
-                  |> String.concat " " in
-                 if i = 0
-                 then sprintf "%s(** %s\n" pad (String.capitalize_ascii d)
-                 else sprintf "%s @param %s" comment_pad d)
+                let d = format_comment d in
+                if i = 0
+                then sprintf "%s(** %s" pad d
+                else sprintf "\n%s @param %s" comment_pad d)
               descr in
           String.concat "\n" descr ^ " *)\n" in
     sprintf "%s%sval %s : %s%s\n"

@@ -153,6 +153,7 @@ let definition_module ?(path = [])
                       (schema : Swagger_j.schema) =
   let required = default [] schema.required in
   let properties = default [] schema.properties in
+  let descr = schema.description in
 
   let create_param name type_ required_params =
     let n = Param.name name in
@@ -176,11 +177,11 @@ let definition_module ?(path = [])
         (Schema.create ~reference_base ~reference_root:root schema) in
     let typ =
       Type.create
-        (Type.Sig.abstract "t")
+        (Type.Sig.abstract ?descr "t")
         (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
-        (Val.Sig.(pure "create" [positional param_type] "t"))
+        (Val.Sig.(pure ?descr "create" [positional param_type] "t"))
         (Val.Impl.(identity "create" [positional "t" "t"])) in
     ([typ], [create]) in
 
@@ -210,20 +211,24 @@ let definition_module ?(path = [])
               ~orig_name:name
               ~type_:impl_type in
           let value =
+            (* XXX Adding these descriptions cause "Unbound module" errors
+             * even though they only add comments to the generated code... *)
+            (* let descr = schema.description in *)
             Val.create
-              (Val.Sig.pure pname [Val.Sig.positional "t"] sig_type)
+              (Val.Sig.pure ?descr:None pname [Val.Sig.positional "t"] sig_type)
               (Val.Impl.record_accessor pname [Val.Impl.positional "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])
         properties in
     let values = create :: List.rev values in
-    let type_sig = Type.Sig.abstract "t" in
+    let type_sig = Type.Sig.abstract ?descr "t" in
     let type_impl = Type.Impl.record "t" fields in
     let typ = Type.create type_sig type_impl in
     ([typ], values) in
 
   let phantom_type () =
-    let typ = Type.create (Type.Sig.phantom "t") (Type.Impl.phantom "t") in
+    let typ =
+      Type.create (Type.Sig.phantom ?descr "t") (Type.Impl.phantom "t") in
     ([typ], []) in
 
   let types, values =

@@ -1,20 +1,29 @@
 open Printf
+open Util
 
 module Sig = struct
   type t =
-    | Abstract of string
-    | Phantom of string
+    | Abstract of string * string option
+    | Phantom of string * string option
 
-  let abstract name = Abstract name
-  let phantom name = Phantom name
+  let abstract ?descr name = Abstract (name, descr)
+  let phantom ?descr name = Phantom (name, descr)
 
   let to_string ?(indent = 0) t =
     let pad = String.make indent ' ' in
-    let name, attr =
+    let name, doc, attr =
       match t with
-      | Abstract name -> name, " [@@deriving yojson]"
-      | Phantom name -> name, " [@@deriving yojson]" in
-    sprintf "%stype %s%s\n" pad name attr
+      | Abstract (name, Some descr) ->
+          let descr = format_comment descr in
+          name, sprintf "%s(** %s *)\n" pad descr, " [@@deriving yojson]"
+      | Abstract (name, None) ->
+          name, "", " [@@deriving yojson]"
+      | Phantom (name, Some descr) ->
+          let descr = format_comment descr in
+          name, sprintf "%s(** %s *)\n" pad descr, " [@@deriving yojson]"
+      | Phantom (name, None) ->
+          name, "", " [@@deriving yojson]" in
+    sprintf "%s%stype %s%s\n" doc pad name attr
 end
 
 module Impl = struct
@@ -65,7 +74,7 @@ let create signature implementation = { signature; implementation }
 
 let name t =
   match t.signature with
-  | Abstract n | Phantom n -> n
+  | Sig.Abstract (n, _) | Sig.Phantom (n, _) -> n
 
 let signature t =
   t.signature

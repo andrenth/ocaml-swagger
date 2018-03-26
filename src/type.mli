@@ -1,8 +1,8 @@
 module Sig : sig
   type t
 
-  val abstract : string -> t
-  val phantom : string -> t
+  val abstract : ?descr:string -> string -> t
+  val phantom : ?descr:string -> string -> t
 
   val to_string : ?indent:int -> t -> string
 end
