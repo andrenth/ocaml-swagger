@@ -136,10 +136,7 @@ let rec impl_to_string ?(indent = 0) m =
     |> StringMap.bindings
     |> List.fold_left
          (fun acc (name, m) ->
-           let s = impl_to_string ~indent:(indent + 2) m in
-           (* Definitions first to simplify references *)
-           if name = "Definitions" then s ^ acc
-           else acc ^ s)
+           acc ^ impl_to_string ~indent:(indent + 2) m)
          "" in
   let decl =
     if m.recursive
