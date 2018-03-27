@@ -15,15 +15,16 @@ module Sig = struct
       match t with
       | Abstract (name, Some descr) ->
           let descr = format_comment descr in
-          name, sprintf "%s(** %s *)\n" pad descr, " [@@deriving yojson]"
+          name, sprintf "%s(** %s *)\n" pad descr, ""
       | Abstract (name, None) ->
-          name, "", " [@@deriving yojson]"
+          name, "", ""
       | Unspecified (name, Some descr) ->
           let descr = format_comment descr in
-          name, sprintf "%s(** %s *)\n" pad descr, " = Yojson.json"
+          let doc = sprintf "%s(** %s *)\n" pad descr in
+          name, doc, " = Yojson.Safe.json"
       | Unspecified (name, None) ->
-          name, "", " = Yojson.json" in
-    sprintf "%s%stype %s%s\n" doc pad name rest
+          name, "", " = Yojson.Safe.json" in
+    sprintf "%s%stype %s%s [@@deriving yojson]\n" doc pad name rest
 end
 
 module Impl = struct
@@ -47,22 +48,24 @@ module Impl = struct
 
   let to_string ?(indent = 0) t =
     let pad = String.make indent ' ' in
-    match t with
-    | Unspecified name ->
-        sprintf "%stype %s = Yojson.json\n" pad name
-    | Alias (name, target) ->
-        sprintf "%stype %s = %s [@@deriving yojson]\n" pad name target
-    | Record (name, fields) ->
-        let s =
-          List.fold_left
-            (fun acc { name; orig_name; type_ } ->
-               let attr =
-                 if name = orig_name then ""
-                 else sprintf " [@key \"%s\"]" orig_name in
-               sprintf "%s %s : %s%s;" acc name type_ attr)
-            ""
-            fields in
-        sprintf "%stype %s = {%s } [@@deriving yojson]\n" pad name s
+    let type_ =
+      match t with
+      | Unspecified name ->
+          sprintf "%stype %s = Yojson.Safe.json" pad name
+      | Alias (name, target) ->
+          sprintf "%stype %s = %s" pad name target
+      | Record (name, fields) ->
+          let s =
+            List.fold_left
+              (fun acc { name; orig_name; type_ } ->
+                 let attr =
+                   if name = orig_name then ""
+                   else sprintf " [@key \"%s\"]" orig_name in
+                 sprintf "%s %s : %s%s;" acc name type_ attr)
+              ""
+              fields in
+          sprintf "%stype %s = {%s }" pad name s in
+    sprintf "%s [@@deriving yojson]\n" type_
 end
 
 type t =
