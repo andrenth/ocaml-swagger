@@ -3,6 +3,7 @@ type t
 val empty : string -> ?recursive:bool -> ?path:string list -> unit -> t
 
 val create : name:string
+          -> ?descr:string
           -> ?recursive:bool
           -> ?path:string list
           -> ?types:Type.t list

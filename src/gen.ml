@@ -153,7 +153,6 @@ let definition_module ?(path = [])
                       (schema : Swagger_j.schema) =
   let required = default [] schema.required in
   let properties = default [] schema.properties in
-  let descr = schema.description in
 
   let create_param name type_ required_params =
     let n = Param.name name in
@@ -177,11 +176,11 @@ let definition_module ?(path = [])
         (Schema.create ~reference_base ~reference_root:root schema) in
     let typ =
       Type.create
-        (Type.Sig.abstract ?descr "t")
+        (Type.Sig.abstract "t")
         (Type.Impl.alias "t" param_type) in
     let create =
       Val.create
-        (Val.Sig.(pure ?descr "create" [positional param_type] "t"))
+        (Val.Sig.(pure "create" [positional param_type] "t"))
         (Val.Impl.(identity "create" [positional "t" "t"])) in
     ([typ], [create]) in
 
@@ -219,14 +218,14 @@ let definition_module ?(path = [])
         ([], [])
         properties in
     let values = create :: List.rev values in
-    let type_sig = Type.Sig.abstract ?descr "t" in
+    let type_sig = Type.Sig.abstract "t" in
     let type_impl = Type.Impl.record "t" fields in
     let typ = Type.create type_sig type_impl in
     ([typ], values) in
 
   let phantom_type () =
     let typ =
-      Type.create (Type.Sig.phantom ?descr "t") (Type.Impl.phantom "t") in
+      Type.create (Type.Sig.phantom "t") (Type.Impl.phantom "t") in
     ([typ], []) in
 
   let types, values =
@@ -235,7 +234,8 @@ let definition_module ?(path = [])
     | None, Some _ -> record_type ()
     | None, None -> phantom_type () in
 
-  Mod.create ~name ~path ~types ~values ()
+  let descr = schema.description in
+  Mod.create ?descr ~name ~path ~types ~values ()
 
 let rec insert_module m root = function
   | [] ->

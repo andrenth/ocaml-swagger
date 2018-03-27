@@ -8,6 +8,7 @@ type t =
   ; values : Val.t list
   ; submodules : t StringMap.t
   ; recursive : bool
+  ; descr : string option
   }
 
 let module_name s =
@@ -22,6 +23,7 @@ let module_name s =
   |> List.hd
 
 let create ~name
+           ?descr
            ?(recursive = false)
            ?(path = [])
            ?(types = [])
@@ -33,6 +35,7 @@ let create ~name
   ; values
   ; submodules
   ; recursive
+  ; descr
   }
 
 let empty name ?(recursive = false) ?(path = []) () =
@@ -102,6 +105,10 @@ let object_module_impl ?(indent = 0) () =
 
 let rec sig_to_string ?(indent = 0) m =
   let pad = String.make indent ' ' in
+  let doc =
+    match m.descr with
+    | Some d -> pad ^ sprintf "(** %s *)\n" (format_comment d)
+    | None -> "" in
   let submods =
     m.submodules
     |> StringMap.bindings
@@ -113,7 +120,8 @@ let rec sig_to_string ?(indent = 0) m =
            else acc ^ s)
          "" in
   let indent = indent + 2 in
-  sprintf "%smodule%s%s : sig\n%s%s\n%s%s%send\n"
+  sprintf "\n%s%smodule%s%s : sig\n%s%s\n%s%s%send\n"
+    doc
     pad
     (if m.recursive then " rec " else " ")
     m.name
