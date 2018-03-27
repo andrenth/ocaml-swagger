@@ -211,11 +211,9 @@ let definition_module ?(path = [])
               ~orig_name:name
               ~type_:impl_type in
           let value =
-            (* XXX Adding these descriptions cause "Unbound module" errors
-             * even though they only add comments to the generated code... *)
-            (* let descr = schema.description in *)
+            let descr = schema.description in
             Val.create
-              (Val.Sig.pure ?descr:None pname [Val.Sig.positional "t"] sig_type)
+              (Val.Sig.pure ?descr pname [Val.Sig.positional "t"] sig_type)
               (Val.Impl.record_accessor pname [Val.Impl.positional "t" "t"]) in
           (field :: fields, value :: values))
         ([], [])

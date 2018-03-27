@@ -13,15 +13,10 @@ module Sig = struct
     let pad = String.make indent ' ' in
     let name, doc, attr =
       match t with
-      | Abstract (name, Some descr) ->
+      | Abstract (name, Some descr) | Phantom (name, Some descr) ->
           let descr = format_comment descr in
-          name, sprintf "%s(** %s *)\n" pad descr, " [@@deriving yojson]"
-      | Abstract (name, None) ->
-          name, "", " [@@deriving yojson]"
-      | Phantom (name, Some descr) ->
-          let descr = format_comment descr in
-          name, sprintf "%s(** %s *)\n" pad descr, " [@@deriving yojson]"
-      | Phantom (name, None) ->
+          name, sprintf "%s(** [%s] *)\n" pad descr, " [@@deriving yojson]"
+      | Abstract (name, None) | Phantom (name, None) ->
           name, "", " [@@deriving yojson]" in
     sprintf "%s%stype %s%s\n" doc pad name attr
 end
