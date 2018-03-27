@@ -4,10 +4,10 @@ open Util
 module Sig = struct
   type t =
     | Abstract of string * string option
-    | Phantom of string * string option
+    | Unspecified of string * string option
 
   let abstract ?descr name = Abstract (name, descr)
-  let phantom ?descr name = Phantom (name, descr)
+  let unspecified ?descr name = Unspecified (name, descr)
 
   let to_string ?(indent = 0) t =
     let pad = String.make indent ' ' in
@@ -18,10 +18,10 @@ module Sig = struct
           name, sprintf "%s(** %s *)\n" pad descr, " [@@deriving yojson]"
       | Abstract (name, None) ->
           name, "", " [@@deriving yojson]"
-      | Phantom (name, Some descr) ->
+      | Unspecified (name, Some descr) ->
           let descr = format_comment descr in
           name, sprintf "%s(** %s *)\n" pad descr, " = Yojson.json"
-      | Phantom (name, None) ->
+      | Unspecified (name, None) ->
           name, "", " = Yojson.json" in
     sprintf "%s%stype %s%s\n" doc pad name rest
 end
@@ -36,19 +36,19 @@ module Impl = struct
   type t =
     | Alias of string * string
     | Record of string * record_field list
-    | Phantom of string
+    | Unspecified of string
 
   let record_field ~name ~orig_name ~type_ =
     { name; orig_name; type_ }
 
   let alias name target = Alias (name, target)
   let record name fields = Record (name, fields)
-  let phantom name = Phantom name
+  let unspecified name = Unspecified name
 
   let to_string ?(indent = 0) t =
     let pad = String.make indent ' ' in
     match t with
-    | Phantom name ->
+    | Unspecified name ->
         sprintf "%stype %s = Yojson.json\n" pad name
     | Alias (name, target) ->
         sprintf "%stype %s = %s [@@deriving yojson]\n" pad name target
@@ -74,7 +74,7 @@ let create signature implementation = { signature; implementation }
 
 let name t =
   match t.signature with
-  | Sig.Abstract (n, _) | Sig.Phantom (n, _) -> n
+  | Sig.Abstract (n, _) | Sig.Unspecified (n, _) -> n
 
 let signature t =
   t.signature

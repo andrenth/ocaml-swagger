@@ -223,16 +223,16 @@ let definition_module ?(path = [])
     let typ = Type.create type_sig type_impl in
     ([typ], values) in
 
-  let phantom_type () =
+  let unspec_type () =
     let typ =
-      Type.create (Type.Sig.phantom "t") (Type.Impl.phantom "t") in
+      Type.create (Type.Sig.unspecified "t") (Type.Impl.unspecified "t") in
     ([typ], []) in
 
   let types, values =
     match schema.kind, schema.properties with
     | Some _, _ -> alias_type ()
     | None, Some _ -> record_type ()
-    | None, None -> phantom_type () in
+    | None, None -> unspec_type () in
 
   let descr = schema.description in
   Mod.create ?descr ~name ~path ~types ~values ()
