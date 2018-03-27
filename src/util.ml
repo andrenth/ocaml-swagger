@@ -27,12 +27,17 @@ let snake_case =
       let s = underscore re2 s in
       let s = Re.replace_string re3 ~by:"_" s in
       sprintf "%c" s.[0]
-      ^ String.lowercase_ascii (String.sub s 1 (String.length s - 1))
+        ^ String.lowercase_ascii (String.sub s 1 (String.length s - 1))
     else
       s
 
 let format_comment =
-  let re = Re.Pcre.regexp "[{}@\[\]]" in
+  let re = Re.Pcre.regexp "[{}@\\[\\]]" in
+  let snake_case = function
+    | "CamelCase" -> "CamelCase"
+    | w when String.length w > 6 && String.sub w 0 7 = "http://" -> w
+    | w when String.length w > 7 && String.sub w 0 8 = "https://" -> w
+    | w -> snake_case w in
   fun text ->
     text
     |> Re.replace re ~f:(fun g -> "\\" ^ Re.Group.get g 0)
