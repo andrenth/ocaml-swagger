@@ -80,8 +80,13 @@ module Sig = struct
     let pad = String.make indent ' ' in
     let params =
       match kind with
-      | Pure -> params
-      | Http_request -> params @ [positional "Uri.t"] in
+      | Pure ->
+          params
+      | Http_request ->
+          let ctx = optional "ctx" "Cohttp_lwt_unix.Client.ctx" in
+          let headers = optional "headers" "Cohttp.Header.t" in
+          let uri = positional "Uri.t" in
+          params @ [ctx; headers; uri] in
     let doc =
       match descr with
       | [] -> ""
@@ -291,10 +296,15 @@ module Impl = struct
     |> List.filter (fun p -> param_location p = Some `Header)
     |> function
        | [] ->
-           "None"
+           "headers"
        | hs ->
-           sprintf {| Some (Header.add_list (Head.init ()) %s) |}
-             (assoc_string hs)
+           sprintf {|
+             let headers =
+               match headers with
+               | Some hs -> hs
+               | None -> Header.init () in
+             Some (Header.add_list headers %s)
+           |} (assoc_string hs)
 
   let make_body params =
     let body_params =
@@ -340,12 +350,12 @@ module Impl = struct
     let result_cont = continuation_of_http_verb verb in
     let body_param =
       if body_param
-      then sprintf "?body:(%s) " (make_body params)
+      then sprintf " ?body:(%s)" (make_body params)
       else "" in
     let response_code =
       match return with
       | Module module_name -> sprintf {|
-        Client.%s %s?headers uri >>= %s
+        Client.%s ?ctx ?headers%s uri >>= %s
         let json = Yojson.Safe.from_string body in
         Lwt.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
       |} client_fun body_param result_cont module_name
@@ -355,7 +365,7 @@ module Impl = struct
             | "string" -> "body"
             | other    -> sprintf "(%s_of_string body)" other in
           sprintf {|
-        Client.%s %s?headers uri >>= %s
+        Client.%s ?ctx ?headers%s uri >>= %s
         Lwt.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
       |} client_fun body_param result_cont (conv_result type_name) in
     let code =
@@ -418,8 +428,13 @@ module Impl = struct
     let pad = String.make indent ' ' in
     let params =
       match kind with
-      | Http_request _ -> params @ [positional "uri" "Uri.t"]
-      | _ -> params in
+      | Http_request _ ->
+          let ctx = optional "ctx" "Cohttp_lwt_unix.Client.ctx" in
+          let headers = optional "headers" "Cohttp.Header.t" in
+          let uri = positional "uri" "Uri.t" in
+          params @ [ctx; headers; uri]
+      | _ ->
+          params in
     match kind with
     | Derived -> ""
     | _ ->
