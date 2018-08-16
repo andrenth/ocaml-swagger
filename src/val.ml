@@ -71,8 +71,8 @@ module Sig = struct
   let params_to_string params =
     let rec go acc = function
       | [] -> acc
-      (* extra unit param if last one is optional *)
-      | [Optional _ as p] -> sprintf "%s%s -> unit -> " acc (param_to_string p)
+      (* extra unit param if last one is optional or named *)
+      | [(Optional _ | Named _) as p] -> sprintf "%s%s -> unit -> " acc (param_to_string p)
       | p :: ps -> go (sprintf "%s%s -> " acc (param_to_string p)) ps in
     go "" params
 
@@ -420,7 +420,8 @@ module Impl = struct
   let params_to_string params =
     let rec go acc = function
       | [] -> acc
-      | [Optional _ as p] -> sprintf "%s%s () " acc (param_to_string p)
+      (* extra () param if last one is optional or named *)
+      | [(Optional _ | Named _) as p] -> sprintf "%s%s () " acc (param_to_string p)
       | p::ps -> go (sprintf "%s%s " acc (param_to_string p)) ps in
     go "" params
 
