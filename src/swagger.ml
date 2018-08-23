@@ -4,6 +4,7 @@ let codegen ~path_base
             ~definition_base
             ~reference_base
             ~reference_root
+            ~io
             ?(output = stdout)
             ~input =
   let ic = open_in input in
@@ -14,6 +15,7 @@ let codegen ~path_base
     ~definition_base
     ~reference_base
     ~reference_root
+    ~io
     swagger
   |> Gen.to_string
   |> fprintf output "%s\n%!"

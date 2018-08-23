@@ -6,6 +6,8 @@ module Sig = struct
     | Pure
     | Http_request
 
+  type io = [`Lwt | `Async]
+
   type param_data =
     { name : string
     ; descr : string option
@@ -18,7 +20,7 @@ module Sig = struct
 
   type return =
     | Simple of string
-    | Async of string
+    | Async of io * string
 
   type t =
     { name      : string
@@ -56,8 +58,8 @@ module Sig = struct
   let constant name =
     pure name [Positional "unit"] "string"
 
-  let http_request ?descr name params ret =
-    create ?descr Http_request name params (Async ret)
+  let http_request ?descr name params ret io =
+    create ?descr Http_request name params (Async (io, ret))
 
   let param_to_string = function
     | Named ({ name }, type_) -> sprintf "%s:%s" name type_
@@ -66,7 +68,10 @@ module Sig = struct
 
   let return_to_string = function
     | Simple t -> t
-    | Async t -> sprintf "(%s, string) result Lwt.t" t
+    | Async (io, t) ->
+      match io with
+      | `Lwt -> sprintf "(%s, string) result Lwt.t" t
+      | `Async -> sprintf "(%s, string) result Async.Deferred.t" t
 
   let params_to_string params =
     let rec go acc = function
@@ -83,10 +88,16 @@ module Sig = struct
       | Pure ->
           params
       | Http_request ->
-          let ctx = optional "ctx" "Cohttp_lwt_unix.Client.ctx" in
-          let headers = optional "headers" "Cohttp.Header.t" in
-          let uri = positional "Uri.t" in
-          params @ [ctx; headers; uri] in
+        let ctx =
+          match return with
+          | Simple (_ : string) -> assert false
+          | Async (`Lwt, (_ : string)) ->
+            [optional "ctx" "Cohttp_lwt_unix.Client.ctx"]
+          | Async (`Async, (_ : string)) ->
+            [] in
+        let headers = optional "headers" "Cohttp.Header.t" in
+        let uri = positional "Uri.t" in
+        params @ ctx @ [headers; uri] in
     let doc =
       match descr with
       | [] -> ""
@@ -116,12 +127,14 @@ module Impl = struct
     | Module of string
     | Type of string
 
+  type io = [`Lwt | `Async]
+
   type kind =
     | Record_constructor
     | Record_accessor
     | Identity
     | Constant of string
-    | Http_request of http_verb * return
+    | Http_request of http_verb * io * return
     | Derived
 
   type origin =
@@ -167,7 +180,7 @@ module Impl = struct
   let identity = create Identity
   let constant name value =
     create (Constant value) name [positional "()" "unit"]
-  let http_request ~return verb = create (Http_request (verb, return))
+  let http_request ~return verb io = create (Http_request (verb, io, return))
   let derived = create Derived "" []
 
   let param_name = function
@@ -342,10 +355,10 @@ module Impl = struct
     | verb -> string_of_http_verb verb
 
   let continuation_of_http_verb = function
-    | Head -> "fun resp ->let code = resp |> Response.status |> Code.code_of_status in\nlet body = \"Ok\" in"
+    | Head -> "fun resp -> let code = resp |> Response.status |> Code.code_of_status in\nlet body = \"Ok\" in"
     | _ -> "fun (resp, body) ->\nlet code = resp |> Response.status |> Code.code_of_status in\nBody.to_string body >>= fun body ->"
 
-  let build_http_request ~pad ?(body_param = false) ~return verb params =
+  let build_http_request ~pad ?(body_param = false) ~io ~return verb params =
     let client_fun = client_function_of_http_verb verb in
     let result_cont = continuation_of_http_verb verb in
     let body_param =
@@ -353,27 +366,42 @@ module Impl = struct
       then sprintf " ?body:(%s)" (make_body params)
       else "" in
     let response_code =
+      let io_module, ctx =
+        match io with
+        | `Lwt -> "Lwt", "?ctx"
+        | `Async -> "Async.Deferred", "" in
       match return with
       | Module module_name -> sprintf {|
-        Client.%s ?ctx ?headers%s uri >>= %s
+        Client.%s %s ?headers%s uri >>= %s
         let json = Yojson.Safe.from_string body in
-        Lwt.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
-      |} client_fun body_param result_cont module_name
+        %s.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
+      |} client_fun ctx body_param result_cont io_module module_name
       | Type type_name ->
           let conv_result = function
             | "unit"   -> "()"
             | "string" -> "body"
             | other    -> sprintf "(%s_of_string body)" other in
           sprintf {|
-        Client.%s ?ctx ?headers%s uri >>= %s
-        Lwt.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
-      |} client_fun body_param result_cont (conv_result type_name) in
+        Client.%s %s ?headers%s uri >>= %s
+        %s.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
+      |} client_fun ctx body_param result_cont io_module (conv_result type_name) in
     let code =
+      let io_preamble =
+        match io with
+        | `Lwt -> {|
+          let open Lwt.Infix in
+          let open Cohttp in
+          let open Cohttp_lwt_unix in
+          let module Body = Cohttp_lwt.Body in
+        |}
+        | `Async -> {|
+          let open Async in
+          let open Cohttp in
+          let open Cohttp_async in
+          let module Body = Cohttp_async.Body in
+        |} in
       String.trim @@ sprintf {|
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
+        %s
         let query = %s in
         let path =
           %s in
@@ -381,19 +409,19 @@ module Impl = struct
         let uri = Uri.with_query' uri (List.filter (fun (k, v) -> v <> "") query) in
         let headers = %s in
         %s
-      |} (make_query params) (make_path params) (make_headers params) (String.trim response_code) in
+      |} io_preamble (make_query params) (make_path params) (make_headers params) (String.trim response_code) in
     code
     |> String.split_on_char '\n'
     |> List.map (fun l -> sprintf "%s%s" pad (trim_at_most 10 l))
     |> String.concat "\n"
 
-  let http_get     ~return = build_http_request                  ~return Get
-  let http_put     ~return = build_http_request ~body_param:true ~return Put
-  let http_post    ~return = build_http_request ~body_param:true ~return Post
-  let http_delete  ~return = build_http_request ~body_param:true ~return Delete
-  let http_head    ~return = build_http_request                  ~return Head
-  let http_patch   ~return = build_http_request ~body_param:true ~return Patch
-  let http_options ~return = build_http_request                  ~return Options
+  let http_get     ~io ~return = build_http_request                  ~io ~return Get
+  let http_put     ~io ~return = build_http_request ~body_param:true ~io ~return Put
+  let http_post    ~io ~return = build_http_request ~body_param:true ~io ~return Post
+  let http_delete  ~io ~return = build_http_request ~body_param:true ~io ~return Delete
+  let http_head    ~io ~return = build_http_request                  ~io ~return Head
+  let http_patch   ~io ~return = build_http_request ~body_param:true ~io ~return Patch
+  let http_options ~io ~return = build_http_request                  ~io ~return Options
 
   let body_to_string ?(indent = 0) t =
     let pad = String.make indent ' ' in
@@ -402,13 +430,13 @@ module Impl = struct
     | Record_accessor -> sprintf "%st.%s" pad t.name
     | Identity -> sprintf "%st" pad
     | Constant v -> sprintf "%s\"%s\"" pad v
-    | Http_request (Get, return) -> http_get ~pad ~return t.params
-    | Http_request (Put, return) -> http_put ~pad ~return t.params
-    | Http_request (Post, return) -> http_post ~pad ~return t.params
-    | Http_request (Delete, return) -> http_delete ~pad ~return t.params
-    | Http_request (Head, return) -> http_head ~pad ~return t.params
-    | Http_request (Patch, return) -> http_patch ~pad ~return t.params
-    | Http_request (Options, return) -> http_options ~pad ~return t.params
+    | Http_request (Get, io, return) -> http_get ~pad ~io ~return t.params
+    | Http_request (Put, io, return) -> http_put ~pad ~io ~return t.params
+    | Http_request (Post, io, return) -> http_post ~pad ~io ~return t.params
+    | Http_request (Delete, io, return) -> http_delete ~pad ~io ~return t.params
+    | Http_request (Head, io, return) -> http_head ~pad ~io ~return t.params
+    | Http_request (Patch, io, return) -> http_patch ~pad ~io ~return t.params
+    | Http_request (Options, io, return) -> http_options ~pad ~io ~return t.params
     | Derived ->
         failwith "Val.Impl.body_to_string: derived functions have no body"
 
@@ -429,11 +457,16 @@ module Impl = struct
     let pad = String.make indent ' ' in
     let params =
       match kind with
-      | Http_request _ ->
-          let ctx = optional "ctx" "Cohttp_lwt_unix.Client.ctx" in
+      | Http_request (_, io, _) ->
+          let ctx =
+            match io with
+            | `Lwt ->
+              [optional "ctx" "Cohttp_lwt_unix.Client.ctx"]
+            | `Async ->
+              [] in
           let headers = optional "headers" "Cohttp.Header.t" in
           let uri = positional "uri" "Uri.t" in
-          params @ [ctx; headers; uri]
+          params @ ctx @ [headers; uri]
       | _ ->
           params in
     match kind with

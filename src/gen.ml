@@ -100,7 +100,7 @@ let make_dups params =
     StringMap.empty
     params
 
-let operation_val ~root ~reference_base ~reference_root name (params : Swagger_j.parameter list) = function
+let operation_val ~root ~reference_base ~reference_root ~io name (params : Swagger_j.parameter list) = function
   | Some (op : Swagger_j.operation) ->
       let op_params = parse_parameters op.parameters in
       let params = merge_params params op_params in
@@ -117,13 +117,13 @@ let operation_val ~root ~reference_base ~reference_root name (params : Swagger_j
       let verb = Val.Impl.http_verb_of_string name in
       let signature =
         let descr = op.description in
-        Val.Sig.http_request ?descr name param_sigs return_type in
+        Val.Sig.http_request ?descr name param_sigs return_type io in
       let return =
         match return_module with
         | Some module_name -> Val.Impl.module_ module_name
         | None -> Val.Impl.type_ return_type in
       let implementation =
-        Val.Impl.http_request verb name param_impls ~return in
+        Val.Impl.http_request verb io name param_impls ~return in
       Some (Val.create signature implementation)
   | None ->
       None
@@ -133,10 +133,10 @@ let path_val path =
     (Val.Sig.constant "request_path_template")
     (Val.Impl.constant "request_path_template" path)
 
-let path_item_vals ~root ~reference_base ~reference_root ~path (item : Swagger_j.path_item) : Val.t list =
+let path_item_vals ~root ~reference_base ~reference_root ~io ~path (item : Swagger_j.path_item) : Val.t list =
   let params = parse_parameters item.parameters in
   let operation_val name =
-    operation_val ~root ~reference_base ~reference_root name params in
+    operation_val ~root ~reference_base ~reference_root ~io name params in
   let get     = operation_val "get"     item.get in
   let put     = operation_val "put"     item.put in
   let post    = operation_val "post"    item.post in
@@ -253,7 +253,7 @@ let remove_base base segments =
   | Some base, s::ss when base = s -> ss
   | _ -> segments
 
-let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
+let rec build_paths ~root ~path_base ~reference_base ~reference_root ~io = function
   | [] ->
       root
   | (path, item) :: paths ->
@@ -266,15 +266,15 @@ let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
       match parents_and_child with
       | Some (parents, child) ->
           let child_values =
-            path_item_vals ~root ~reference_base ~reference_root ~path item in
+            path_item_vals ~root ~reference_base ~reference_root ~io ~path item in
           let child_module = Mod.with_values ~path:parents child child_values in
           let root = insert_module child_module root parents in
-          build_paths ~root ~path_base ~reference_base ~reference_root paths
+          build_paths ~root ~path_base ~reference_base ~reference_root ~io paths
       | None ->
           let child_values =
-            path_item_vals ~root ~reference_base ~reference_root ~path item in
+            path_item_vals ~root ~reference_base ~reference_root ~path ~io item in
           let root = Mod.add_vals child_values root in
-          build_paths ~root ~path_base ~reference_base ~reference_root paths
+          build_paths ~root ~path_base ~reference_base ~reference_root ~io paths
 
 let rec build_definitions ~root ~definition_base ~reference_base l =
   match l with
@@ -307,7 +307,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
 let of_swagger ?(path_base = "")
                ?(definition_base = "")
                ?(reference_base = "")
-               ~reference_root s =
+               ~reference_root ~io s =
   let open Swagger_j in
   let definitions = default [] s.definitions in
   let title = s.info.title in
@@ -323,6 +323,7 @@ let of_swagger ?(path_base = "")
       ~path_base
       ~reference_base
       ~reference_root:defs
+      ~io
       s.paths in
   Mod.add_mod defs root
 

@@ -19,7 +19,7 @@ let snake_case =
       sprintf "%s_%s"
         (Re.Group.get groups 1)
         (Re.Group.get groups 2) in
-    Re.replace re replace s in
+    Re.replace re ~f:replace s in
   fun s ->
     let len = String.length s in
     if len > 1 then
