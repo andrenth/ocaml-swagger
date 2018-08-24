@@ -13,4 +13,5 @@
 (library
  ((name swagger)
   (public_name swagger)
+  (flags (:standard -warn-error -9-27-32-34-39))
   (libraries (atdgen re.pcre yojson))))
