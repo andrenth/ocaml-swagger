@@ -1,0 +1,11 @@
+language: c
+sudo: false
+services:
+  - docker
+install: wget https://raw.githubusercontent.com/ocaml/ocaml-travisci-skeleton/master/.travis-docker.sh
+script: bash -ex ./.travis-docker.sh
+env:
+  matrix:
+  - PACKAGE="swagger"       DISTRO="ubuntu-18.04" OCAML_VERSION="4.05"
+os:
+  - linux
