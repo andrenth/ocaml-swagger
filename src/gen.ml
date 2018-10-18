@@ -184,8 +184,8 @@ let definition_module ?(path = [])
         (Type.Impl.alias "t" param_type ~int_or_string) in
     let create =
       Val.create
-        (Val.Sig.(pure "create" [positional param_type] "t"))
-        (Val.Impl.(identity "create" [positional "t" "t"])) in
+        (Val.Sig.(pure "make" [positional param_type] "t"))
+        (Val.Impl.(identity "make" [positional "t" "t"])) in
     ([typ], [create]) in
 
   let record_type () =
@@ -193,8 +193,8 @@ let definition_module ?(path = [])
     let sig_params, impl_params = params |> List.split in
     let create =
       Val.create
-        (Val.Sig.pure "create" sig_params "t")
-        (Val.Impl.record_constructor "create" impl_params) in
+        (Val.Sig.pure "make" sig_params "t")
+        (Val.Impl.record_constructor "make" impl_params) in
     let fields, values =
       List.fold_left
         (fun (fields, values) (name, schema) ->
