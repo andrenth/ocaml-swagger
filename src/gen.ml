@@ -174,10 +174,14 @@ let definition_module ?(path = [])
     let param_type =
       Schema.kind_to_string
         (Schema.create ~reference_base ~reference_root:root schema) in
+    let int_or_string =
+      match schema.format with
+      | Some "int-or-string" -> true
+      | _ -> false in
     let typ =
       Type.create
         (Type.Sig.abstract "t")
-        (Type.Impl.alias "t" param_type) in
+        (Type.Impl.alias "t" param_type ~int_or_string) in
     let create =
       Val.create
         (Val.Sig.(pure "create" [positional param_type] "t"))
