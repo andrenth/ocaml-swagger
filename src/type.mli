@@ -28,6 +28,16 @@ module Impl : sig
   type record_field
   (** The type of record fields. *)
 
+  val record : string -> record_field list -> t
+  val unspecified : string -> t
+
+  val record_field : name:string
+                  -> orig_name:string
+                  -> type_:string
+                  -> record_field
+
+  (** Constructor function for record fields. *)
+
   val alias : ?int_or_string:bool -> string -> string -> t
   (** Defines an alias type to be generated in an implementation.
 
@@ -36,17 +46,6 @@ module Impl : sig
       specification as a ["string"] type having an ["int-or-string"] format.
       The generated JSON conversion functions will attempt to produce an
       integer value if the string repersents a valid integer. *)
-
-  val record : string -> record_field list -> t
-  val unspecified : string -> t
-
-  val record_field : name:string
-                  -> orig_name:string
-                  -> type_:string
-                  -> record_field
-  (** Constructor function for record fields. *)
-
-  val alias : string -> string -> t
   val record : string -> record_field list -> t
   val unspecified : string -> t
 
