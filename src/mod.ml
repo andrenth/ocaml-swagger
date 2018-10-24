@@ -51,6 +51,9 @@ let submodules m =
   |> StringMap.bindings
   |> List.map snd
 
+(* Unused values. *)
+[@@@ocaml.warning "-32"]
+
 let add_type t m =
   { m with types = t :: m.types }
 
@@ -60,17 +63,20 @@ let add_val v m =
 let add_types ts m =
   { m with types = m.types @ ts }
 
+let map_submodules f m =
+  { m with submodules = StringMap.map f m.submodules }
+
+[@@@end]
+
+let has_submodules m =
+  StringMap.is_empty m.submodules
+
 let add_vals vs m =
   { m with values = m.values @ vs }
 
 let add_mod subm m =
   { m with submodules = StringMap.add subm.name subm m.submodules }
 
-let map_submodules f m =
-  { m with submodules = StringMap.map f m.submodules }
-
-let has_submodules m =
-  StringMap.is_empty m.submodules
 
 let find_submodule name m =
   StringMap.find_opt (module_name name) m.submodules
@@ -87,7 +93,7 @@ let path m =
 let qualified_name m =
   match m.path with
   | [] -> m.name
-  | p -> sprintf "%s.%s" (String.concat "." m.path) m.name
+  | _p -> sprintf "%s.%s" (String.concat "." m.path) m.name
 
 let qualified_path m =
   m.path @ [m.name]
@@ -143,7 +149,7 @@ let rec impl_to_string ?(indent = 0) m =
     m.submodules
     |> StringMap.bindings
     |> List.fold_left
-         (fun acc (name, m) ->
+         (fun acc (_name, m) ->
            acc ^ impl_to_string ~indent:(indent + 2) m)
          "" in
   let decl =
