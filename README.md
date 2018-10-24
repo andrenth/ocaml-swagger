@@ -74,7 +74,7 @@ acts as a namespace will have its named derived from the API's
 Inside this module, a module structure mirroring the URI structure of
 definitions and operations defined in the Swagger specification will be created.
 
-The code for Definitions defines a type `t` for the definition, a `create`
+The code for Definitions defines a type `t` for the definition, a `make`
 function taking as many arguments as necessary to create it, and one accessor
 function for each definition property.
 
