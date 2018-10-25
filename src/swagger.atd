@@ -226,7 +226,8 @@ type path_item =
   ; ?head : operation option
   ; ?patch : operation option
   ; ?parameters : json list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
-  }
+  ; ?extensions : (string * json) list option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">
 
