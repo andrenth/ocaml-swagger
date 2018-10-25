@@ -10,6 +10,9 @@ module StringSet = Set.Make (struct
   let compare = compare
 end)
 
+(* Unused types. *)
+[@@@ocaml.warning "-34"]
+
 type parameter_or_reference =
   [ `Parameter of Swagger_j.parameter
   | `Reference of Swagger_j.reference
@@ -19,6 +22,8 @@ type response_or_reference =
   [ `Response of Swagger_j.response
   | `Reference of Swagger_j.reference
   ]
+
+[@@@end]
 
 let merge_params (ps1 : Swagger_j.parameter list)
                  (ps2 : Swagger_j.parameter list) =
@@ -85,7 +90,7 @@ let rec return_type ~reference_root ~reference_base (resps : Swagger_j.responses
             check first res
         | (_code', resp')::rs when responses_match first resp' ->
             check first rs
-        | (c, (r : Swagger_j.response))::_ ->
+        | (_c, (_r : Swagger_j.response))::_ ->
             failwith "multiple response types are not supported" in
       let resp = parse_response resp in
       check resp (parse_responses rs);
@@ -100,7 +105,7 @@ let make_dups params =
     StringMap.empty
     params
 
-let operation_val ~root ~reference_base ~reference_root ~io name (params : Swagger_j.parameter list) = function
+let operation_val ~root:_ ~reference_base ~reference_root ~io name (params : Swagger_j.parameter list) = function
   | Some (op : Swagger_j.operation) ->
       let op_params = parse_parameters op.parameters in
       let params = merge_params params op_params in
@@ -174,14 +179,18 @@ let definition_module ?(path = [])
     let param_type =
       Schema.kind_to_string
         (Schema.create ~reference_base ~reference_root:root schema) in
+    let int_or_string =
+      match schema.format with
+      | Some "int-or-string" -> true
+      | _ -> false in
     let typ =
       Type.create
         (Type.Sig.abstract "t")
-        (Type.Impl.alias "t" param_type) in
+        (Type.Impl.alias "t" param_type ~int_or_string) in
     let create =
       Val.create
-        (Val.Sig.(pure "create" [positional param_type] "t"))
-        (Val.Impl.(identity "create" [positional "t" "t"])) in
+        (Val.Sig.(pure "make" [positional param_type] "t"))
+        (Val.Impl.(identity "make" [positional "t" "t"])) in
     ([typ], [create]) in
 
   let record_type () =
@@ -189,8 +198,8 @@ let definition_module ?(path = [])
     let sig_params, impl_params = params |> List.split in
     let create =
       Val.create
-        (Val.Sig.pure "create" sig_params "t")
-        (Val.Impl.record_constructor "create" impl_params) in
+        (Val.Sig.pure "make" sig_params "t")
+        (Val.Impl.record_constructor "make" impl_params) in
     let fields, values =
       List.fold_left
         (fun (fields, values) (name, schema) ->
@@ -248,10 +257,15 @@ let rec insert_module m root = function
           let subm = Mod.empty p ~path:(Mod.qualified_path root) () in
           Mod.add_mod (insert_module m subm ps) root
 
+(* Unused values. *)
+[@@@ocaml.warning "-32"]
+
 let remove_base base segments =
   match base, segments with
   | Some base, s::ss when base = s -> ss
   | _ -> segments
+
+[@@@end]
 
 let rec build_paths ~root ~path_base ~reference_base ~reference_root ~io = function
   | [] ->
@@ -301,7 +315,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
   (* XXX Ignore schemas that are simply references? Just use the referenced
    * module? In the kubernetes API this seems to be only for deprecated
    * stuff. *)
-  | (name, (schema : Swagger_j.schema)) :: defs ->
+  | (_name, (_schema : Swagger_j.schema)) :: defs ->
       build_definitions ~root ~definition_base ~reference_base defs
 
 let of_swagger ?(path_base = "")

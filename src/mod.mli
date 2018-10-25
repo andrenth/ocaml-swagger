@@ -19,7 +19,10 @@ val with_values : string
                -> t
 
 val name : t -> string
+
 val qualified_name : t -> string
+
+val submodules : t -> t list
 
 val path : t -> string list
 val qualified_path : t -> string list

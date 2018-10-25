@@ -32,8 +32,8 @@ module Sig = struct
 
   let param_descr = function
     | Positional _
-    | Named ({ descr = None }, _)
-    | Optional ({ descr = None }, _) ->
+    | Named ({ descr = None; _ }, _)
+    | Optional ({ descr = None; _ }, _) ->
         None
     | Named ({ name; descr = Some descr }, _) ->
         Some (sprintf "%s %s" name descr)
@@ -62,9 +62,9 @@ module Sig = struct
     create ?descr Http_request name params (Async (io, ret))
 
   let param_to_string = function
-    | Named ({ name }, type_) -> sprintf "%s:%s" name type_
+    | Named ({ name; _ }, type_) -> sprintf "%s:%s" name type_
     | Positional type_ -> type_
-    | Optional ({ name }, type_) -> sprintf "?%s:%s" name type_
+    | Optional ({ name; _ }, type_) -> sprintf "?%s:%s" name type_
 
   let return_to_string = function
     | Simple t -> t
@@ -181,18 +181,12 @@ module Impl = struct
   let constant name value =
     create (Constant value) name [positional "()" "unit"]
   let http_request ~return verb io = create (Http_request (verb, io, return))
-  let derived = create Derived "" []
 
   let param_name = function
     | Named (p, _) | Positional p | Optional (p, _) -> p.name
 
   let param_type = function
     | Named (p, _) | Positional p | Optional (p, _) -> p.type_
-
-  let param_orig_name = function
-    | Named (_, Some origin) -> Some origin.orig_name
-    | Optional (_, Some origin) -> Some origin.orig_name
-    | Named (_, None) | Optional (_, None) | Positional _ -> None
 
   let param_location = function
     | Named (_, Some origin) -> Some origin.location
@@ -201,9 +195,20 @@ module Impl = struct
     | Optional (_, None) -> None
     | Positional _ -> None
 
+  [@@@ocaml.warning "-32"]
+
+  let param_orig_name = function
+    | Named (_, Some origin) -> Some origin.orig_name
+    | Optional (_, Some origin) -> Some origin.orig_name
+    | Named (_, None) | Optional (_, None) | Positional _ -> None
+
+  let derived = create Derived "" []
+
   let is_optional = function
     | Optional _ -> true
     | _ -> false
+
+  [@@@end]
 
   let http_verb_of_string = function
     | "get"     -> Get

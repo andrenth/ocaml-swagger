@@ -15,7 +15,7 @@ let rec item_kind_to_string (items : Swagger_j.items option) = function
       | None -> failwith ("item_kind_to_string: array type must have an "
                           ^ "'items' field")
 
-let rec kind_to_string (p : t) =
+let kind_to_string (p : t) =
   match some p.kind with
   | `String  -> "string"
   | `Number  -> "float"
@@ -44,6 +44,9 @@ let name n =
   if is_keyword n then n ^ "_"
   else n
 
+(* Unused values. *)
+[@@@ocaml.warning "-32"]
+
 let prefix_strings required =
   if required
   then ("", "~")
@@ -52,6 +55,8 @@ let prefix_strings required =
 let kind = function
   | true -> `Named
   | false -> `Optional
+
+[@@@end]
 
 let string_of_location = function
   | `Query    -> "query"
