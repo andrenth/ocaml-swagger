@@ -33,6 +33,6 @@ module Adapters = struct
              `Assoc (assoc @ rest)
            | (_ : (string * Yojson.Safe.json) list) ->
              failwith "invalid json: assoc list contains duplicates")
-      in
+
   end
 end

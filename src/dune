@@ -1,7 +1,7 @@
 (rule
  (targets swagger_j.ml swagger_j.mli)
- (deps    swagger.atd)
- (action  (run atdgen -j %{deps})))
+ (deps    swagger.atd patch.txt)
+ (action  (progn (run atdgen -j swagger.atd) (bash "patch -p0 < patch.txt"))))
 
 (rule
  (targets swagger_t.ml swagger_t.mli)

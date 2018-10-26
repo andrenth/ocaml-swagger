@@ -1,0 +1,11 @@
+--- swagger_j.ml	2018-10-26 17:13:58.000000000 -0400
++++ swagger_j.ml.fixed	2018-10-26 17:14:41.000000000 -0400
+@@ -7416,7 +7416,7 @@
+   read__28 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
+ let write_operation : _ -> operation -> _ = (
+   Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
+-    fun ob x ->
++    fun ob (x : operation) ->
+       Bi_outbuf.add_char ob '{';
+       let is_first = ref true in
+       (match x.tags with None -> () | Some x ->

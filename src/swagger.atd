@@ -214,7 +214,8 @@ type operation =
   ; ?schemes : scheme list option
   ; ~deprecated <ocaml default="false"> : bool
   ; ?security : security_requirement list option
-  }
+  ; ?vendor_extensions : (string * json) list <json repr="object"> option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type path_item =
   { ?ref : string option (* validation? *)
@@ -226,8 +227,7 @@ type path_item =
   ; ?head : operation option
   ; ?patch : operation option
   ; ?parameters : json list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
-  ; ?extensions : (string * json) list option
-  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
+  }
 
 type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">
 
