@@ -321,6 +321,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
 let of_swagger ?(path_base = "")
                ?(definition_base = "")
                ?(reference_base = "")
+               ?vendor_extension_plugin
                ~reference_root ~io s =
   let open Swagger_j in
   let definitions = default [] s.definitions in
@@ -339,7 +340,16 @@ let of_swagger ?(path_base = "")
       ~reference_root:defs
       ~io
       s.paths in
-  Mod.add_mod defs root
+  let all = Mod.add_mod defs root in
+  match vendor_extension_plugin with
+  | Some postprocess ->
+    let (mod_to_string, m) = postprocess s all in
+    let mod_to_string =
+      match mod_to_string with
+      | None -> Mod.to_string ?indent:None
+      | Some f -> f in
+    (mod_to_string, m)
+  | None -> (Mod.to_string ?indent:None, all)
 
 let object_module = String.trim {|
 module Object = struct
@@ -379,5 +389,5 @@ module Object = struct
 end
 |}
 
-let to_string m =
-  sprintf "%s\n\n%s" object_module (Mod.to_string m)
+let to_string (mod_to_string, m) =
+  sprintf "%s\n\n%s" object_module (mod_to_string m)
