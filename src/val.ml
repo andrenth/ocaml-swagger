@@ -66,6 +66,9 @@ module Sig = struct
     | Positional type_ -> type_
     | Optional ({ name; _ }, type_) -> sprintf "?%s:%s" name type_
 
+  let name t = t.name
+  let return t = t.return
+
   let return_to_string = function
     | Simple t -> t
     | Async (io, t) ->
@@ -129,12 +132,19 @@ module Impl = struct
 
   type io = [`Lwt | `Async]
 
+  type http_request =
+    { verb : http_verb
+    ; io : io
+    ; return : return
+    ; streaming : bool
+    }
+
   type kind =
     | Record_constructor
     | Record_accessor
     | Identity
     | Constant of string
-    | Http_request of http_verb * io * return
+    | Http_request of http_request
     | Derived
 
   type origin =
@@ -168,10 +178,13 @@ module Impl = struct
     Optional ({ name; type_ }, origin)
 
   type t =
-    { name   : string
-    ; params : param list
-    ; kind   : kind
+    { name      : string
+    ; params    : param list
+    ; kind      : kind
     }
+
+  let name t = t.name
+  let kind t = t.kind
 
   let create kind name params = { kind; name; params }
 
@@ -180,7 +193,7 @@ module Impl = struct
   let identity = create Identity
   let constant name value =
     create (Constant value) name [positional "()" "unit"]
-  let http_request ~return verb io = create (Http_request (verb, io, return))
+  let http_request ?(streaming=false) ~return verb io = create (Http_request {verb; io; return; streaming})
 
   let param_name = function
     | Named (p, _) | Positional p | Optional (p, _) -> p.name
@@ -359,13 +372,35 @@ module Impl = struct
     | Options -> "call `OPTIONS"
     | verb -> string_of_http_verb verb
 
-  let continuation_of_http_verb = function
-    | Head -> "fun resp -> let code = resp |> Response.status |> Code.code_of_status in\nlet body = \"Ok\" in"
-    | _ -> "fun (resp, body) ->\nlet code = resp |> Response.status |> Code.code_of_status in\nBody.to_string body >>= fun body ->"
+  let continuation_of_http_verb io streaming = function
+    | Head -> {|
+        fun resp ->
+          let code =
+            resp
+            |> Response.status
+            |> Code.code_of_status in
+          let body = "Ok" in
+      |}
+    | _ ->
+      let body_ret =
+        if streaming then
+          match io with
+          | `Async -> "Async.Deferred.return (Body.to_pipe body)"
+          | `Lwt -> "Lwt.return (Body.to_streaming body)"
+        else
+          "Body.to_string body" in
+      sprintf {|
+        fun (resp, body) ->
+          let code =
+            resp
+            |> Response.status
+            |> Code.code_of_status in
+          %s >>= fun body ->
+      |} body_ret
 
-  let build_http_request ~pad ?(body_param = false) ~io ~return verb params =
+  let build_http_request ~pad ?(body_param = false) ~io ~return verb streaming params =
     let client_fun = client_function_of_http_verb verb in
-    let result_cont = continuation_of_http_verb verb in
+    let result_cont = continuation_of_http_verb io streaming verb in
     let body_param =
       if body_param
       then sprintf " ?body:(%s)" (make_body params)
@@ -435,13 +470,13 @@ module Impl = struct
     | Record_accessor -> sprintf "%st.%s" pad t.name
     | Identity -> sprintf "%st" pad
     | Constant v -> sprintf "%s\"%s\"" pad v
-    | Http_request (Get, io, return) -> http_get ~pad ~io ~return t.params
-    | Http_request (Put, io, return) -> http_put ~pad ~io ~return t.params
-    | Http_request (Post, io, return) -> http_post ~pad ~io ~return t.params
-    | Http_request (Delete, io, return) -> http_delete ~pad ~io ~return t.params
-    | Http_request (Head, io, return) -> http_head ~pad ~io ~return t.params
-    | Http_request (Patch, io, return) -> http_patch ~pad ~io ~return t.params
-    | Http_request (Options, io, return) -> http_options ~pad ~io ~return t.params
+    | Http_request {verb=Get; io; return; streaming} -> http_get ~pad ~io ~return streaming t.params
+    | Http_request {verb=Put; io; return; streaming} -> http_put ~pad ~io ~return streaming t.params
+    | Http_request {verb=Post; io; return; streaming} -> http_post ~pad ~io ~return streaming t.params
+    | Http_request {verb=Delete; io; return; streaming} -> http_delete ~pad ~io ~return streaming t.params
+    | Http_request {verb=Head; io; return; streaming} -> http_head ~pad ~io ~return streaming t.params
+    | Http_request {verb=Patch; io; return; streaming} -> http_patch ~pad ~io ~return streaming t.params
+    | Http_request {verb=Options; io; return; streaming} -> http_options ~pad ~io ~return streaming t.params
     | Derived ->
         failwith "Val.Impl.body_to_string: derived functions have no body"
 
@@ -462,7 +497,7 @@ module Impl = struct
     let pad = String.make indent ' ' in
     let params =
       match kind with
-      | Http_request (_, io, _) ->
+      | Http_request {verb=_; return=_; io; streaming=_} ->
           let ctx =
             match io with
             | `Lwt ->

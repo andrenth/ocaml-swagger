@@ -18,13 +18,13 @@ module Adapters = struct
       |> List.partition (fun (name, _) ->
            (String.length name >= 2) && (name.[0] = 'x' && name.[1] = '-'))
       |> (fun (extensions, rest) ->
-           `Assoc (("extensions", `Assoc extensions) :: rest))
+           `Assoc (("_vendor_extensions", `Assoc extensions) :: rest))
 
     (* val restore : Yojson.Safe.json -> Yojson.Safe.json *)
     let restore json =
       Yojson.Safe.Util.to_assoc json
       |> List.partition (fun (name, _) ->
-           String.equal name "extensions")
+           String.equal name "_vendor_extensions")
       |> (fun (extensions, rest) ->
            match extensions with
            | [] -> `Assoc rest
