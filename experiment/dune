@@ -1,0 +1,4 @@
+(executable
+  (name main)
+  (libraries async yojson)
+  (preprocess (pps ppx_jane)))
