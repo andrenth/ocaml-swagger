@@ -389,5 +389,43 @@ module Object = struct
 end
 |}
 
-let to_string (mod_to_string, m) =
-  sprintf "%s\n\n%s" object_module (mod_to_string m)
+let io_helper_module io =
+  match io with
+  | `Lwt -> failwith "Not yet supported"
+  | `Async -> String.trim {|
+module Io_helper = struct
+  open! Core
+  open! Async
+  let map_stream f x = Pipe.map x ~f
+  let stream_json in_pipe =
+    let open Async in
+    Pipe.create_reader ~close_on_exception:true (fun out_pipe ->
+      let rec read_pipe_loop acc =
+        Pipe.read in_pipe >>= function
+        | `Eof -> return ()
+        | `Ok chunk ->
+          let chunk = acc ^ chunk in
+          let lexer_state = Yojson.init_lexer () in
+          let lexbuf = Lexing.from_string chunk in
+          let rec emit_many () =
+            let pos = lexbuf.lex_curr_pos in
+            try
+              let json = Yojson.Safe.from_lexbuf ~stream:true lexer_state lexbuf in
+              Pipe.write out_pipe json >>= emit_many
+            with
+              | (Yojson.Json_error _) ->
+                let len = lexbuf.lex_buffer_len - pos in
+                let remaining = Bytes.sub lexbuf.lex_buffer ~pos ~len in
+                return (Bytes.to_string remaining)
+              | Yojson.End_of_input ->
+                return ""
+          in
+          emit_many () >>= read_pipe_loop
+      in
+      read_pipe_loop ""
+    )
+end
+|}
+
+let to_string ~io (mod_to_string, m) =
+  sprintf "%s\n\n%s\n\n%s" (io_helper_module io) object_module (mod_to_string m)

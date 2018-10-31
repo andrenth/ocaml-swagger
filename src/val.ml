@@ -405,17 +405,27 @@ module Impl = struct
       if body_param
       then sprintf " ?body:(%s)" (make_body params)
       else "" in
+    let to_json =
+      if streaming
+      then "Io_helper.stream_json"
+      else "Yojson.Safe.from_string" in
     let response_code =
       let io_module, ctx =
         match io with
         | `Lwt -> "Lwt", "?ctx"
         | `Async -> "Async.Deferred", "" in
       match return with
-      | Module module_name -> sprintf {|
+      | Module module_name ->
+          let of_json module_name =
+            let pure = sprintf "%s.of_yojson json" module_name in
+            if streaming
+            then sprintf "Ok (Io_helper.map_stream (fun json -> %s |> function Ok x -> x | Error e -> failwith e) json)" pure
+            else pure in
+          sprintf {|
         Client.%s %s ?headers%s uri >>= %s
-        let json = Yojson.Safe.from_string body in
-        %s.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
-      |} client_fun ctx body_param result_cont io_module module_name
+        let json = %s body in
+        %s.return (if code >= 200 && code < 300 then %s else Error "Unable to start stream for %s")
+      |} client_fun ctx body_param result_cont to_json io_module (of_json module_name) module_name
       | Type type_name ->
           let conv_result = function
             | "unit"   -> "()"
