@@ -368,9 +368,10 @@ module Impl = struct
     | Patch   -> "patch"
     | Options -> "options"
 
-  let client_function_of_http_verb = function
-    | Options -> "call `OPTIONS"
-    | verb -> string_of_http_verb verb
+  let client_function_of_http_verb verb =
+    match verb with
+    | Head -> string_of_http_verb verb
+    | verb -> sprintf "call `%s" (string_of_http_verb verb |> String.uppercase_ascii)
 
   let continuation_of_http_verb io streaming = function
     | Head -> {|
@@ -409,6 +410,7 @@ module Impl = struct
       if streaming
       then "Io_helper.stream_json"
       else "Yojson.Safe.from_string" in
+    let chunked = if streaming then "~chunked:true" else "" in
     let response_code =
       let io_module, ctx =
         match io with
@@ -422,19 +424,19 @@ module Impl = struct
             then sprintf "Ok (Io_helper.map_stream (fun json -> %s |> function Ok x -> x | Error e -> failwith e) json)" pure
             else pure in
           sprintf {|
-        Client.%s %s ?headers%s uri >>= %s
+        Client.%s %s %s ?headers%s uri >>= %s
         let json = %s body in
         %s.return (if code >= 200 && code < 300 then %s else Error "Unable to start stream for %s")
-      |} client_fun ctx body_param result_cont to_json io_module (of_json module_name) module_name
+      |} client_fun ctx chunked body_param result_cont to_json io_module (of_json module_name) module_name
       | Type type_name ->
           let conv_result = function
             | "unit"   -> "()"
             | "string" -> "body"
             | other    -> sprintf "(%s_of_string body)" other in
           sprintf {|
-        Client.%s %s ?headers%s uri >>= %s
+        Client.%s %s %s ?headers%s uri >>= %s
         %s.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
-      |} client_fun ctx body_param result_cont io_module (conv_result type_name) in
+      |} client_fun ctx chunked body_param result_cont io_module (conv_result type_name) in
     let code =
       let io_preamble =
         match io with
