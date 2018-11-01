@@ -421,7 +421,7 @@ module Impl = struct
           let of_json module_name =
             let pure = sprintf "%s.of_yojson json" module_name in
             if streaming
-            then sprintf "Ok (Io_helper.map_stream (fun json -> %s |> function Ok x -> x | Error e -> failwith e) json)" pure
+            then sprintf "Ok (Io_helper.map_stream (fun json -> %s |> function Ok x -> x | Error _ -> failwith (Yojson.Safe.to_string json)) json)" pure
             else pure in
           sprintf {|
         Client.%s %s %s ?headers%s uri >>= %s
