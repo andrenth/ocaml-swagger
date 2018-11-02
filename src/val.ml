@@ -129,6 +129,7 @@ module Impl = struct
   type return =
     | Module of string
     | Type of string
+    | Module_custom_of_json of (unit -> string)
 
   type io = [`Lwt | `Async]
 
@@ -417,6 +418,12 @@ module Impl = struct
         | `Lwt -> "Lwt", "?ctx"
         | `Async -> "Async.Deferred", "" in
       match return with
+      | Module_custom_of_json of_json ->
+          sprintf {|
+        Client.%s %s %s ?headers%s uri >>= %s
+        let json = %s body in
+        %s.return (if code >= 200 && code < 300 then Ok (%s) else Error "Unable to start stream")
+      |} client_fun ctx chunked body_param result_cont to_json io_module (of_json ())
       | Module module_name ->
           let of_json module_name =
             let pure = sprintf "%s.of_yojson json" module_name in

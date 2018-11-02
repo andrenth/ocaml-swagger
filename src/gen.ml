@@ -342,14 +342,8 @@ let of_swagger ?(path_base = "")
       s.paths in
   let all = Mod.add_mod defs root in
   match vendor_extension_plugin with
-  | Some postprocess ->
-    let (mod_to_string, m) = postprocess s all in
-    let mod_to_string =
-      match mod_to_string with
-      | None -> Mod.to_string ?indent:None
-      | Some f -> f in
-    (mod_to_string, m)
-  | None -> (Mod.to_string ?indent:None, all)
+  | Some postprocess -> postprocess s all
+  | None -> all
 
 let object_module = String.trim {|
 module Object = struct
@@ -427,5 +421,5 @@ module Io_helper = struct
 end
 |}
 
-let to_string ~io (mod_to_string, m) =
-  sprintf "%s\n\n%s\n\n%s" (io_helper_module io) object_module (mod_to_string m)
+let to_string ~io m =
+  sprintf "%s\n\n%s\n\n%s" (io_helper_module io) object_module (Mod.to_string m)
