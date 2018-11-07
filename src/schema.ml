@@ -35,9 +35,7 @@ let rec kind_to_string t =
               | None, Some `Integer -> "Object.Of_ints.t"
               | None, Some `Boolean -> "Object.Of_bools.t"
               | None, _ -> sprintf "(string * %s) list" (kind_to_string (create ~reference_base ~reference_root props)))
-          | None ->
-              failwith ("Schema.kind_to_string: object without "
-                        ^ "additional_properties"))
+          | None -> "unit")
       | `Array   ->
           let open Swagger_j in
           match t.raw.items with
