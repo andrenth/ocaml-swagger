@@ -1,5 +1,5 @@
---- swagger_j.ml	2018-10-26 19:56:28.000000000 -0400
-+++ swagger_j.ml.fixed	2018-10-26 19:56:40.000000000 -0400
+--- swagger_j.ml	2018-11-10 18:46:51.000000000 -0500
++++ swagger_j.ml.fixed	2018-11-10 18:47:03.000000000 -0500
 @@ -1067,7 +1067,7 @@
    read__3 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_external_documentation : _ -> external_documentation -> _ = (
@@ -18,83 +18,25 @@
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        (match x.name with None -> () | Some x ->
-@@ -1769,9 +1769,9 @@
-   let ob = Bi_outbuf.create len in
-   write__6 ob x;
+@@ -1771,7 +1771,7 @@
    Bi_outbuf.contents ob
--and write_items : _ -> items -> _ = (
-+and write_items : _ -> items -> _ = (fun ob (x : items) ->
+ and write_items ob (x : items) = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
 -    fun ob x ->
 +    fun ob (x : items) ->
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        if !is_first then
-@@ -1971,7 +1971,7 @@
-           ob x;
-       );
-       Bi_outbuf.add_char ob '}';
--  )
-+  ) ob x
- )
- and string_of_items ?(len = 1024) x =
-   let ob = Bi_outbuf.create len in
-@@ -2025,7 +2025,7 @@
- )
- and _6_of_string s =
-   read__6 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
--and read_items = (
-+and read_items = (fun p lb ->
-   Atdgen_runtime.Oj_run.read_with_adapter Swagger_util.Adapters.Extensions.normalize (
-     fun p lb ->
-       Yojson.Safe.read_space p lb;
-@@ -2870,7 +2870,7 @@
-             }
-            : items)
-         )
--  )
-+  ) p lb
- )
- and items_of_string s =
-   read_items (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
-@@ -2912,9 +2912,9 @@
-   let ob = Bi_outbuf.create len in
-   write__19 ob x;
+@@ -2914,7 +2914,7 @@
    Bi_outbuf.contents ob
--and write_schema : _ -> schema -> _ = (
-+and write_schema : _ -> schema -> _ = (fun ob (x : schema) ->
+ and write_schema ob (x : schema) = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
 -    fun ob x ->
 +    fun ob (x : schema) ->
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        (match x.ref with None -> () | Some x ->
-@@ -3259,7 +3259,7 @@
-           ob x;
-       );
-       Bi_outbuf.add_char ob '}';
--  )
-+  ) ob x
- )
- and string_of_schema ?(len = 1024) x =
-   let ob = Bi_outbuf.create len in
-@@ -3418,7 +3418,7 @@
- )
- and _19_of_string s =
-   read__19 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
--and read_schema = (
-+and read_schema = (fun p lb ->
-   Atdgen_runtime.Oj_run.read_with_adapter Swagger_util.Adapters.Extensions.normalize (
-     fun p lb ->
-       Yojson.Safe.read_space p lb;
-@@ -4833,13 +4833,13 @@
-             }
-            : schema)
-         )
--  )
-+  ) p lb
- )
- and schema_of_string s =
+@@ -4839,7 +4839,7 @@
    read_schema (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_tag : _ -> tag -> _ = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
@@ -112,7 +54,7 @@
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        if !is_first then
-@@ -6095,7 +6095,7 @@
+@@ -6099,7 +6099,7 @@
    read_kind (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_header : _ -> header -> _ = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
@@ -121,7 +63,7 @@
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        (match x.description with None -> () | Some x ->
-@@ -7371,7 +7371,7 @@
+@@ -7375,7 +7375,7 @@
    read__25 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_response : _ -> response -> _ = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
@@ -130,7 +72,7 @@
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        if !is_first then
-@@ -7871,7 +7871,7 @@
+@@ -7875,7 +7875,7 @@
    read__29 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_operation : _ -> operation -> _ = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
@@ -139,7 +81,7 @@
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        (match x.tags with None -> () | Some x ->
-@@ -9423,7 +9423,7 @@
+@@ -9427,7 +9427,7 @@
    read__22 (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_parameter : _ -> parameter -> _ = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
@@ -148,7 +90,7 @@
        Bi_outbuf.add_char ob '{';
        let is_first = ref true in
        if !is_first then
-@@ -10816,7 +10816,7 @@
+@@ -10822,7 +10822,7 @@
    read_parameters_definitions (Yojson.Safe.init_lexer ()) (Lexing.from_string s)
  let write_license : _ -> license -> _ = (
    Atdgen_runtime.Oj_run.write_with_adapter Swagger_util.Adapters.Extensions.restore (
