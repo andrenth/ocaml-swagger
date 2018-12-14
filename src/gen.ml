@@ -239,6 +239,7 @@ let definition_module ?(path = [])
 
   let types, values =
     match schema.kind, schema.properties with
+    | Some `Object, _ -> record_type ()
     | Some _, _ -> alias_type ()
     | None, Some _ -> record_type ()
     | None, None -> unspec_type () in
