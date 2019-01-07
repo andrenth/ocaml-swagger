@@ -426,7 +426,7 @@ module Impl = struct
       |} client_fun ctx chunked body_param result_cont to_json io_module (of_json ())
       | Module module_name ->
           let of_json module_name =
-            let pure = sprintf "print_endline body; %s.of_yojson json" module_name in
+            let pure = sprintf "(print_endline body; %s.of_yojson json)" module_name in
             if streaming
             then sprintf "Ok (Io_helper.map_stream (fun json -> %s |> function Ok x -> x | Error _ -> failwith (Yojson.Safe.to_string json)) json)" pure
             else pure in
