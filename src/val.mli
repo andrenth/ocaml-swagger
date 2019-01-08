@@ -35,7 +35,7 @@ module Impl : sig
   type return =
     | Module of string
     | Type of string
-    | Module_custom_of_json of (unit -> string)
+    | Module_custom_of_json of ((string -> string) * string)
   type io = [`Lwt | `Async]
   type http_request =
     { verb : http_verb
