@@ -1,4 +1,12 @@
-type t
+type t =
+  { name : string
+  ; path : string list
+  ; types : Type.t list
+  ; values : Val.t list
+  ; submodules : t Util.StringMap.t
+  ; recursive : bool
+  ; descr : string option
+  }
 
 val empty : string -> ?recursive:bool -> ?path:string list -> unit -> t
 
@@ -44,5 +52,7 @@ val reference_type : reference_base:string
 
 val split_ref : string -> string list
 val strip_base : string -> string -> string
+
+val module_name : string -> string
 
 val to_string : ?indent:int -> t -> string

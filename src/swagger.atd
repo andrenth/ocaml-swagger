@@ -1,15 +1,19 @@
 type json <ocaml module="Yojson.Safe"> = abstract
 
+type vendor_extensions = (string * json) list <json repr="object">
+
 type contact =
   { ?name : string option
   ; ?url <ocaml valid="Swagger_util.Validate.url"> : string option
   ; ?email <ocaml valid="Swagger_util.Validate.email"> : string option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type license =
   { name : string
   ; ?url <ocaml valid="Swagger_util.Validate.url"> : string option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type info =
   { title : string
@@ -18,7 +22,8 @@ type info =
   ; ?contact : contact option
   ; ?license : license option
   ; version : string
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type scheme =
   [ Http  <json name="http">
@@ -58,7 +63,8 @@ type xml =
   ; ?prefix : string option
   ; ~attribute <ocaml default="false"> : bool
   ; ~wrapped <ocaml default="false"> : bool
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type items_kind =
   [ String  <json name="string">
@@ -86,12 +92,14 @@ type items =
   ; ?unique_items <json name="uniqueItems"> : bool option
   ; ?enum : json list option
   ; ?multiple_of <json name="multipleOf"> : int option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type external_documentation =
   { ?description : string option
   ; url <ocaml valid="Swagger_util.Validate.url"> : string
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type schema_kind =
   [ Boolean <json name="boolean">
@@ -133,7 +141,8 @@ type schema =
   ; ?xml : xml option
   ; ?external_docs : external_documentation option
   ; ?example : json option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type parameter =
   { name : string
@@ -159,7 +168,8 @@ type parameter =
   ; ?unique_items <json name="uniqueItems"> : bool option
   ; ?enum : json list option
   ; ?multiple_of <json name="multipleOf"> : int option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type parameters_definitions = (string * parameter) list <json repr="object">
 
@@ -182,7 +192,8 @@ type header =
   ; ?unique_items <json name="uniqueItems"> : bool option
   ; ?enum : json list option
   ; ?multiple_of <json name="multipleOf"> : int option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type headers = (string * header) list <json repr="object">
 
@@ -193,13 +204,15 @@ type response =
   ; ?schema : schema option
   ; ?headers : headers option
   ; ?examples : example option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type responses_definitions = (string * response) list <json repr="object">
 
 type reference <ocaml valid="Swagger_util.Validate.url"> = string
 
 type responses = (string * json) list <json repr="object">
+(* how to support vendor extensions? *)
 
 type operation =
   { ?tags : string list option
@@ -214,7 +227,8 @@ type operation =
   ; ?schemes : scheme list option
   ; ~deprecated <ocaml default="false"> : bool
   ; ?security : security_requirement list option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type path_item =
   { ?ref : string option (* validation? *)
@@ -226,9 +240,12 @@ type path_item =
   ; ?head : operation option
   ; ?patch : operation option
   ; ?parameters : json list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">
+(*  how to support vendor extensions? *)
+
 
 type security_scheme_type =
   [ Basic  <json name="basic">
@@ -249,6 +266,7 @@ type security_scheme_flow =
   ]
 
 type scopes = (string * string) list <json repr="object">
+(* how to support vendor extensions? *)
 
 (* The Swagger 2.0 spec says all fields in the Security Scheme Object are required, except
    "description". However, the Kubernetes spec includes neither flow, authorization, tokenUrl
@@ -262,7 +280,8 @@ type security_scheme =
   ; ?authorization_url <json name="authorizationUrl"> <ocaml valid="Swagger_util.Validate.url"> : string option
   ; ?token_url <json name="tokenUrl"> <ocaml valid="Swagger_util.Validate.url"> : string option
   ; ?scopes : scopes option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type security_definitions = (string * security_scheme) list <json repr="object">
 
@@ -272,7 +291,8 @@ type tag =
   { name : string
   ; ?description : string option
   ; ?external_docs <json name="externalDocs"> : external_documentation option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">
 
 type definitions = (string * schema) list <json repr="object">
 
@@ -292,4 +312,5 @@ type swagger =
   ; ?security : security_requirement list option
   ; ?tags : tag list option (* validate uniqueness *)
   ; ?external_docs <json name="externalDocs"> : external_documentation option
-  }
+  ; ?_vendor_extensions : vendor_extensions option
+  } <json adapter.ocaml="Swagger_util.Adapters.Extensions">

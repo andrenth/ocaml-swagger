@@ -1,7 +1,7 @@
 (rule
  (targets swagger_j.ml swagger_j.mli)
  (deps    swagger.atd)
- (action  (run atdgen -j %{deps})))
+ (action  (progn (run atdgen -j swagger.atd))))
 
 (rule
  (targets swagger_t.ml swagger_t.mli)
