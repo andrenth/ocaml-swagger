@@ -71,8 +71,11 @@ let resp_type ~reference_base ~reference_root (resp : Swagger_j.response) =
 
 let rec return_type ~reference_root ~reference_base (resps : Swagger_j.responses) =
   let is_error code =
-    let code = int_of_string code in
-    code < 200 || code >= 300 in
+    if String.lowercase_ascii code = "default"
+    then true
+    else
+      let code = int_of_string code in
+      code < 200 || code >= 300 in
   let responses_match (r1 : Swagger_j.response)
                       (r2 : Swagger_j.response) =
     r1.schema = r2.schema in
