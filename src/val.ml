@@ -442,8 +442,8 @@ module Impl = struct
             | other    -> sprintf "(%s_of_string body)" other in
           sprintf {|
         Client.%s %s %s ?headers%s uri >>= %s
-        %s.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
-      |} client_fun ctx chunked body_param result_cont io_module (conv_result type_name) in
+        %s.return (if code >= 200 && code < 300 then Ok %s else Error (`Assoc ["type", `String "%s"; "error_code", `Int code; "body", `String body] |> Yojson.Safe.to_string))
+      |} client_fun ctx chunked body_param result_cont io_module (conv_result type_name) type_name in
     let code =
       let io_preamble =
         match io with
