@@ -21,6 +21,7 @@ module Sig = struct
   type return =
     | Simple of string
     | Async of io * string
+    | Custom_async of (io * (string -> string) * string)
 
   type t =
     { name      : string
@@ -70,6 +71,7 @@ module Sig = struct
   let return t = t.return
 
   let return_to_string = function
+    | Custom_async (_, f, x) -> f x
     | Simple t -> t
     | Async (io, t) ->
       match io with
@@ -94,9 +96,9 @@ module Sig = struct
         let ctx =
           match return with
           | Simple (_ : string) -> assert false
-          | Async (`Lwt, (_ : string)) ->
+          | Async (`Lwt, _) | Custom_async (`Lwt, _, _) ->
             [optional "ctx" "Cohttp_lwt_unix.Client.ctx"]
-          | Async (`Async, (_ : string)) ->
+          | Async (`Async, _) | Custom_async (`Async, _, _) ->
             [] in
         let headers = optional "headers" "Cohttp.Header.t" in
         let uri = positional "Uri.t" in
@@ -129,7 +131,17 @@ module Impl = struct
   type return =
     | Module of string
     | Type of string
-    | Module_custom_of_json of ((string -> string) * string)
+    | Custom of
+      (
+        (  string
+        -> client_fun:string
+        -> ctx:string
+        -> body_param:string
+        -> verb:http_verb
+        -> string
+        )
+        * string
+      )
 
   type io = [`Lwt | `Async]
 
@@ -137,7 +149,6 @@ module Impl = struct
     { verb : http_verb
     ; io : io
     ; return : return
-    ; streaming : bool
     }
 
   type kind =
@@ -194,7 +205,7 @@ module Impl = struct
   let identity = create Identity
   let constant name value =
     create (Constant value) name [positional "()" "unit"]
-  let http_request ?(streaming=false) ~return verb io = create (Http_request {verb; io; return; streaming})
+  let http_request ~return verb io = create (Http_request {verb; io; return})
 
   let param_name = function
     | Named (p, _) | Positional p | Optional (p, _) -> p.name
@@ -374,7 +385,7 @@ module Impl = struct
     | Head -> string_of_http_verb verb
     | verb -> sprintf "call `%s" (string_of_http_verb verb |> String.uppercase_ascii)
 
-  let continuation_of_http_verb io streaming = function
+  let continuation_of_http_verb io = function
     | Head -> {|
         fun resp ->
           let code =
@@ -383,67 +394,44 @@ module Impl = struct
             |> Code.code_of_status in
           let body = "Ok" in
       |}
-    | _ ->
-      let body_ret =
-        if streaming then
-          match io with
-          | `Async -> "Async.Deferred.return (Body.to_pipe body)"
-          | `Lwt -> "Lwt.return (Body.to_streaming body)"
-        else
-          "Body.to_string body" in
-      sprintf {|
+    | _ -> {|
         fun (resp, body) ->
           let code =
             resp
             |> Response.status
             |> Code.code_of_status in
-          %s >>= fun body ->
-      |} body_ret
+          Body.to_string body >>= fun body ->
+      |}
 
-  let build_http_request ~pad ?(body_param = false) ~io ~return verb streaming params =
+  let build_http_request ~pad ?(body_param = false) ~io ~return verb params =
     let client_fun = client_function_of_http_verb verb in
-    let result_cont = continuation_of_http_verb io streaming verb in
+    let result_cont = continuation_of_http_verb io verb in
     let body_param =
       if body_param
       then sprintf " ?body:(%s)" (make_body params)
       else "" in
-    let to_json =
-      if streaming
-      then "Io_helper.stream_json"
-      else "Yojson.Safe.from_string" in
-    let chunked = if streaming then "~chunked:true" else "" in
     let response_code =
       let io_module, ctx =
         match io with
         | `Lwt -> "Lwt", "?ctx"
         | `Async -> "Async.Deferred", "" in
       match return with
-      | Module_custom_of_json (of_json, module_name) ->
-          sprintf {|
-        Client.%s %s %s ?headers%s uri >>= %s
-        let json = %s body in
-        %s.return (if code >= 200 && code < 300 then Ok (%s) else Error (`Assoc ["module", `String "%s"; "error_code", `Int code] |> Yojson.Safe.to_string))
-      |} client_fun ctx chunked body_param result_cont to_json io_module (of_json module_name) module_name
-      | Module module_name ->
-          let of_json module_name =
-            let pure = sprintf "%s.of_yojson json" module_name in
-            if streaming
-            then sprintf "Ok (Io_helper.map_stream (fun json -> %s |> function Ok x -> x | Error _ -> failwith (Yojson.Safe.to_string json)) json)" pure
-            else pure in
-          sprintf {|
-        Client.%s %s %s ?headers%s uri >>= %s
-        let json = %s body in
-        %s.return (if code >= 200 && code < 300 then %s else Error "Unable to start stream for %s")
-      |} client_fun ctx chunked body_param result_cont to_json io_module (of_json module_name) module_name
+      | Custom (f, custom) ->
+        f custom ~client_fun ~ctx ~body_param ~verb
+      | Module module_name -> sprintf {|
+        Client.%s %s ?headers%s uri >>= %s
+        let json = Yojson.Safe.from_string body in
+        %s.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
+      |} client_fun ctx body_param result_cont io_module module_name
       | Type type_name ->
-          let conv_result = function
-            | "unit"   -> "()"
-            | "string" -> "body"
-            | other    -> sprintf "(%s_of_string body)" other in
-          sprintf {|
-        Client.%s %s %s ?headers%s uri >>= %s
-        %s.return (if code >= 200 && code < 300 then Ok %s else Error (`Assoc ["type", `String "%s"; "error_code", `Int code; "body", `String body] |> Yojson.Safe.to_string))
-      |} client_fun ctx chunked body_param result_cont io_module (conv_result type_name) type_name in
+        let conv_result = function
+          | "unit"   -> "()"
+          | "string" -> "body"
+          | other    -> sprintf "(%s_of_string body)" other in
+        sprintf {|
+        Client.%s %s ?headers%s uri >>= %s
+        %s.return (if code >= 200 && code < 300 then Ok %s else Error body)
+      |} client_fun ctx body_param result_cont io_module (conv_result type_name) in
     let code =
       let io_preamble =
         match io with
@@ -489,13 +477,13 @@ module Impl = struct
     | Record_accessor -> sprintf "%st.%s" pad t.name
     | Identity -> sprintf "%st" pad
     | Constant v -> sprintf "%s\"%s\"" pad v
-    | Http_request {verb=Get; io; return; streaming} -> http_get ~pad ~io ~return streaming t.params
-    | Http_request {verb=Put; io; return; streaming} -> http_put ~pad ~io ~return streaming t.params
-    | Http_request {verb=Post; io; return; streaming} -> http_post ~pad ~io ~return streaming t.params
-    | Http_request {verb=Delete; io; return; streaming} -> http_delete ~pad ~io ~return streaming t.params
-    | Http_request {verb=Head; io; return; streaming} -> http_head ~pad ~io ~return streaming t.params
-    | Http_request {verb=Patch; io; return; streaming} -> http_patch ~pad ~io ~return streaming t.params
-    | Http_request {verb=Options; io; return; streaming} -> http_options ~pad ~io ~return streaming t.params
+    | Http_request {verb=Get; io; return} -> http_get ~pad ~io ~return t.params
+    | Http_request {verb=Put; io; return} -> http_put ~pad ~io ~return t.params
+    | Http_request {verb=Post; io; return} -> http_post ~pad ~io ~return t.params
+    | Http_request {verb=Delete; io; return} -> http_delete ~pad ~io ~return t.params
+    | Http_request {verb=Head; io; return} -> http_head ~pad ~io ~return t.params
+    | Http_request {verb=Patch; io; return} -> http_patch ~pad ~io ~return t.params
+    | Http_request {verb=Options; io; return} -> http_options ~pad ~io ~return t.params
     | Derived ->
         failwith "Val.Impl.body_to_string: derived functions have no body"
 
@@ -516,7 +504,7 @@ module Impl = struct
     let pad = String.make indent ' ' in
     let params =
       match kind with
-      | Http_request {verb=_; return=_; io; streaming=_} ->
+      | Http_request {verb=_; return=_; io} ->
           let ctx =
             match io with
             | `Lwt ->

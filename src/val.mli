@@ -5,6 +5,7 @@ module Sig : sig
   type return =
     | Simple of string
     | Async of io * string
+    | Custom_async of (io * (string -> string) * string)
   type t =
     { name      : string
     ; params    : param list
@@ -31,17 +32,26 @@ end
 module Impl : sig
   type param
   type origin
-  type http_verb
+  type http_verb = Get | Put | Post | Delete | Head | Patch | Options
   type return =
     | Module of string
     | Type of string
-    | Module_custom_of_json of ((string -> string) * string)
+    | Custom of
+      (
+        (  string
+        -> client_fun:string
+        -> ctx:string
+        -> body_param:string
+        -> verb:http_verb
+        -> string
+        )
+        * string
+      )
   type io = [`Lwt | `Async]
   type http_request =
-    { verb : http_verb
-    ; io : io
-    ; return : return
-    ; streaming : bool
+    { verb      : http_verb
+    ; io        : io
+    ; return    : return
     }
   type kind =
     | Record_constructor
@@ -67,7 +77,7 @@ module Impl : sig
   val identity : string -> param list -> t
   val record_constructor : string -> param list -> t
   val record_accessor : string -> param list -> t
-  val http_request : ?streaming:bool -> return:return -> http_verb -> io -> string -> param list -> t
+  val http_request : return:return -> http_verb -> io -> string -> param list -> t
 
   val origin : Swagger_t.parameter -> origin
 
