@@ -24,7 +24,7 @@ module Sig = struct
           name, doc, " = Yojson.Safe.json"
       | Unspecified (name, None) ->
           name, "", " = Yojson.Safe.json" in
-    sprintf "%s%stype %s%s [@@deriving yojson]\n" doc pad name rest
+    sprintf "%s%stype %s%s [@@deriving yojson, sexp]\n" doc pad name rest
 end
 
 module Impl = struct
@@ -74,11 +74,18 @@ module Impl = struct
     match t with
     | Unspecified name ->
       let type_ = sprintf "%stype %s = Yojson.Safe.json" pad name in
-      sprintf "%s [@@deriving yojson]\n" type_
+      String.concat "\n"
+        [ sprintf "%s [@@deriving yojson]" type_
+        ; ""
+        ; sprintf "%s let sexp_of_%s = Json_derivers.Yojson.sexp_of_t" pad name
+        ; ""
+        ; sprintf "%s let %s_of_sexp = Json_derivers.Yojson.t_of_sexp" pad name
+        ; ""
+        ]
 
     | Alias {name; target; int_or_string = false} ->
       let type_ = sprintf "%stype %s = %s" pad name target in
-      sprintf "%s [@@deriving yojson]\n" type_
+      sprintf "%s [@@deriving yojson, sexp]\n" type_
 
     | Alias {name; target; int_or_string = true} ->
       (* Aliases for string types with "int-or-string" format, in addition to
@@ -90,7 +97,7 @@ module Impl = struct
       assert (target = "string");
 
       let type_ = sprintf "%stype %s = %s" pad name target in
-      sprintf "%s [@@deriving yojson]\n\n%s\n\n%s" type_
+      sprintf "%s [@@deriving yojson, sexp]\n\n%s\n\n%s" type_
         int_or_string_to_yojson
         int_or_string_of_yojson
 
@@ -105,7 +112,7 @@ module Impl = struct
           ""
           fields in
       let type_ = sprintf "%stype %s = {%s }" pad name s in
-      sprintf "%s [@@deriving yojson]\n" type_
+      sprintf "%s [@@deriving yojson, sexp]\n" type_
 end
 
 type t =

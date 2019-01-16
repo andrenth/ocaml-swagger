@@ -348,18 +348,18 @@ let of_swagger ?(path_base = "")
 let object_module = String.trim {|
 module Object = struct
   module type Value = sig
-    type value
+    type value [@@deriving sexp]
     val value_of_yojson : Yojson.Safe.json -> (value, string) result
     val value_to_yojson : value -> Yojson.Safe.json
   end
 
   module type S = sig
     type value
-    type t = (string * value) list [@@deriving yojson]
+    type t = (string * value) list [@@deriving yojson, sexp]
   end
 
   module Make (V : Value) : S with type value := V.value = struct
-    type t = (string * V.value) list [@@deriving yojson]
+    type t = (string * V.value) list [@@deriving yojson, sexp]
 
     let to_yojson obj =
       `Assoc (List.map (fun (k, v) -> (k, V.value_to_yojson v)) obj)
@@ -376,10 +376,10 @@ module Object = struct
       | _ -> Error "invalid object"
   end
 
-  module Of_strings = Make (struct type value = string [@@deriving yojson] end)
-  module Of_floats  = Make (struct type value = float  [@@deriving yojson] end)
-  module Of_ints    = Make (struct type value = int    [@@deriving yojson] end)
-  module Of_bools   = Make (struct type value = bool   [@@deriving yojson] end)
+  module Of_strings = Make (struct type value = string [@@deriving yojson, sexp] end)
+  module Of_floats  = Make (struct type value = float  [@@deriving yojson, sexp] end)
+  module Of_ints    = Make (struct type value = int    [@@deriving yojson, sexp] end)
+  module Of_bools   = Make (struct type value = bool   [@@deriving yojson, sexp] end)
 end
 |}
 
