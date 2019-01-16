@@ -7,4 +7,4 @@ val of_swagger : ?path_base:string
               -> Swagger_t.swagger
               -> Mod.t
 
-val to_string : io:[`Lwt | `Async] -> Mod.t -> string
+val to_string : Mod.t -> string

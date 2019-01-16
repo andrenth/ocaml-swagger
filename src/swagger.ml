@@ -19,5 +19,5 @@ let codegen ~path_base
     ~io
     ?vendor_extension_plugin
     swagger
-  |> Gen.to_string ~io
+  |> Gen.to_string
   |> fprintf output "%s\n%!"
