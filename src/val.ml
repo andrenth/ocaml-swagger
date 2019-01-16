@@ -385,7 +385,7 @@ module Impl = struct
     | Head -> string_of_http_verb verb
     | verb -> sprintf "call `%s" (string_of_http_verb verb |> String.uppercase_ascii)
 
-  let continuation_of_http_verb io = function
+  let continuation_of_http_verb = function
     | Head -> {|
         fun resp ->
           let code =
@@ -405,7 +405,7 @@ module Impl = struct
 
   let build_http_request ~pad ?(body_param = false) ~io ~return verb params =
     let client_fun = client_function_of_http_verb verb in
-    let result_cont = continuation_of_http_verb io verb in
+    let result_cont = continuation_of_http_verb verb in
     let body_param =
       if body_param
       then sprintf " ?body:(%s)" (make_body params)
