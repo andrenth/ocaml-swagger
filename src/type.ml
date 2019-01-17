@@ -65,7 +65,7 @@ module Impl = struct
   let int_or_string_of_yojson = {|
     let of_yojson j =
       match j with
-      | `Int x -> Ok (Yojson.Safe.to_string j)
+      | `Int _ -> Ok (Yojson.Safe.to_string j)
       | _ -> of_yojson j
   |}
 
