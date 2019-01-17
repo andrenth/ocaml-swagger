@@ -371,6 +371,7 @@ module Impl = struct
             | other    -> sprintf "(%s_of_string body)" other in
           sprintf {|
         Client.%s ?ctx ?headers%s uri >>= %s
+        ignore body;
         Lwt.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
       |} client_fun body_param result_cont (conv_result type_name) in
     let code =
@@ -383,7 +384,7 @@ module Impl = struct
         let path =
           %s in
         let uri = Uri.with_path uri path in
-        let uri = Uri.with_query' uri (List.filter (fun (k, v) -> v <> "") query) in
+        let uri = Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query) in
         let headers = %s in
         %s
       |} (make_query params) (make_path params) (make_headers params) (String.trim response_code) in
