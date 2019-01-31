@@ -8,6 +8,7 @@ module Sig : sig
 
   val constant : string -> t
   val pure : ?descr:string -> string -> param list -> string -> t
+  val field_setter : ?descr:string -> string -> param list -> string -> t
   val http_request : ?descr:string -> string -> param list -> string -> t
 
   val to_string : ?indent:int -> t -> string
@@ -27,7 +28,8 @@ module Impl : sig
   val constant : string -> string -> t
   val identity : string -> param list -> t
   val record_constructor : string -> param list -> t
-  val record_accessor : string -> param list -> t
+  val field_getter : string -> param list -> t
+  val field_setter : string -> param list -> t
   val http_request : return:return -> http_verb -> string -> param list -> t
 
   val origin : Swagger_t.parameter -> origin
