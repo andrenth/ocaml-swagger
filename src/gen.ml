@@ -325,10 +325,11 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
 let of_swagger ?(path_base = "")
                ?(definition_base = "")
                ?(reference_base = "")
+               ?module_name
                ~reference_root s =
   let open Swagger_j in
   let definitions = default [] s.definitions in
-  let title = s.info.title in
+  let title = default s.info.title module_name in
   let defs =
     build_definitions
       ~root:(Mod.empty reference_root ~path:[title] ())
