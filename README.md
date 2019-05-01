@@ -27,8 +27,8 @@ $ opam install swagger
 
 ## Usage
 
-Most users will probably only need to use the `Swagger.codegen` function to
-parse an API specification and generate the OCaml code:
+Most users will probably only need to use the `Swagger.codegen` convenience
+function to parse an API specification and generate the OCaml code:
 
 ```ocaml
 let () =
@@ -41,7 +41,31 @@ let () =
     ~reference_root:"Definitions"
 ```
 
-This call instructs OCaml-Swagger to read the API specification from the file
+Alternatively, users can opt to only parse the API specification to modify it
+or traverse it as they wish:
+
+``` ocaml
+open Swagger
+
+let () =
+  (* Construct the data *)
+  let swagger : Swagger_t.swagger =
+    Swagger.swagger_of_input ~input:Sys.argv.(1) in
+
+  (* Say you want to modify the `title` *)
+  let swagger : Swagger_t.swagger =
+     { swagger with info = { swagger.info with title = "New_title" } } in
+
+  (* Generate the code *)
+  Swagger.codegen_swagger_to_string
+    ~swagger
+    ~path_base:"/"
+    ~definition_base:"io.k8s."
+    ~reference_base:"io.k8s."
+    ~reference_root:"Definitions"
+```
+
+These calls instruct OCaml-Swagger to read the API specification from the file
 name given in the first command-line argument and output the resulting code to
 the standard output.
 
