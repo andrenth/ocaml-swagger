@@ -383,7 +383,8 @@ module Impl = struct
         let query = %s in
         let path =
           %s in
-        let uri = Uri.with_path uri path in
+        let full_path = (Uri.path uri) ^ path in
+        let uri = Uri.with_path uri full_path in
         let uri = Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query) in
         let headers = %s in
         %s
