@@ -21,9 +21,9 @@ module Sig = struct
       | Unspecified (name, Some descr) ->
           let descr = format_comment descr in
           let doc = sprintf "%s(** %s *)\n" pad descr in
-          name, doc, " = Yojson.Safe.json"
+          name, doc, " = Yojson.Safe.t"
       | Unspecified (name, None) ->
-          name, "", " = Yojson.Safe.json" in
+          name, "", " = Yojson.Safe.t" in
     sprintf "%s%stype %s%s [@@deriving yojson]\n" doc pad name rest
 end
 
@@ -73,7 +73,7 @@ module Impl = struct
     let pad = String.make indent ' ' in
     match t with
     | Unspecified name ->
-      let type_ = sprintf "%stype %s = Yojson.Safe.json" pad name in
+      let type_ = sprintf "%stype %s = Yojson.Safe.t" pad name in
       sprintf "%s [@@deriving yojson]\n" type_
 
     | Alias {name; target; int_or_string = false} ->

@@ -348,8 +348,8 @@ let object_module = String.trim {|
 module Object = struct
   module type Value = sig
     type value
-    val value_of_yojson : Yojson.Safe.json -> (value, string) result
-    val value_to_yojson : value -> Yojson.Safe.json
+    val value_of_yojson : Yojson.Safe.t -> (value, string) result
+    val value_to_yojson : value -> Yojson.Safe.t
   end
 
   module type S = sig
@@ -363,7 +363,7 @@ module Object = struct
     let to_yojson obj =
       `Assoc (List.map (fun (k, v) -> (k, V.value_to_yojson v)) obj)
 
-    let of_yojson (obj : Yojson.Safe.json) : (t, string) result =
+    let of_yojson (obj : Yojson.Safe.t) : (t, string) result =
       let rec loop acc = function
         | [] -> Ok (List.rev acc)
         | (k, v) :: obj ->

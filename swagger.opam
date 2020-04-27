@@ -13,6 +13,6 @@ depends: [
   "dune"     {build & >= "1.3"}
   "atdgen"   {>= "1.12.0"}
   "re"       {>= "1.7.3"}
-  "yojson"   {>= "1.4.1"}
+  "yojson"   {>= "1.6.0"}
 ]
 available: [ ocaml-version >= "4.05.0" ]
