@@ -14,24 +14,24 @@ end)
 [@@@ocaml.warning "-34"]
 
 type parameter_or_reference =
-  [ `Parameter of Swagger_j.parameter
-  | `Reference of Swagger_j.reference
+  [ `Parameter of Swagger_t.parameter
+  | `Reference of Swagger_t.reference
   ]
 
 type response_or_reference =
-  [ `Response of Swagger_j.response
-  | `Reference of Swagger_j.reference
+  [ `Response of Swagger_t.response
+  | `Reference of Swagger_t.reference
   ]
 
 [@@@end]
 
-let merge_params (ps1 : Swagger_j.parameter list)
-                 (ps2 : Swagger_j.parameter list) =
+let merge_params (ps1 : Swagger_t.parameter list)
+                 (ps2 : Swagger_t.parameter list) =
   let rec merge acc = function
     | [] -> acc
-    | (p : Swagger_j.parameter)::ps ->
-        let same_name (q : Swagger_j.parameter) =
-          let open Swagger_j in
+    | (p : Swagger_t.parameter)::ps ->
+        let same_name (q : Swagger_t.parameter) =
+          let open Swagger_t in
           p.name = q.name in
         if List.exists same_name acc
         then merge acc ps
@@ -60,24 +60,24 @@ let parse_response r =
 let parse_responses =
   List.map (fun (s, r) -> (s, parse_response r))
 
-let resp_type ~reference_base ~reference_root (resp : Swagger_j.response) =
+let resp_type ~reference_base ~reference_root (resp : Swagger_t.response) =
   match resp.schema with
   | None -> (None, "unit")
   | Some s ->
-      let s = Schema.create ~reference_base ~reference_root s in
-      match Schema.reference s with
+      let s = Codegen_schema.create ~reference_base ~reference_root s in
+      match Codegen_schema.reference s with
       | Some r -> reference_module_and_type ~reference_base ~reference_root r
-      | None -> (None, Schema.to_string s)
+      | None -> (None, Codegen_schema.to_string s)
 
-let rec return_type ~reference_root ~reference_base (resps : Swagger_j.responses) =
+let rec return_type ~reference_root ~reference_base (resps : Swagger_t.responses) =
   let is_error code =
     if String.lowercase_ascii code = "default"
     then true
     else
       let code = int_of_string code in
       code < 200 || code >= 300 in
-  let responses_match (r1 : Swagger_j.response)
-                      (r2 : Swagger_j.response) =
+  let responses_match (r1 : Swagger_t.response)
+                      (r2 : Swagger_t.response) =
     r1.schema = r2.schema in
   match resps with
   | [] -> None, "unit"
@@ -93,7 +93,7 @@ let rec return_type ~reference_root ~reference_base (resps : Swagger_j.responses
             check first res
         | (_code', resp')::rs when responses_match first resp' ->
             check first rs
-        | (_c, (_r : Swagger_j.response))::_ ->
+        | (_c, (_r : Swagger_t.response))::_ ->
             failwith "multiple response types are not supported" in
       let resp = parse_response resp in
       check resp (parse_responses rs);
@@ -101,22 +101,22 @@ let rec return_type ~reference_root ~reference_base (resps : Swagger_j.responses
 
 let make_dups params =
   List.fold_left
-    (fun dups (p : Swagger_j.parameter) ->
+    (fun dups (p : Swagger_t.parameter) ->
       match StringMap.find_opt p.name dups with
       | Some count -> StringMap.add p.name (count + 1) dups
       | None -> StringMap.add p.name 1 dups)
     StringMap.empty
     params
 
-let operation_val ~root:_ ~reference_base ~reference_root name (params : Swagger_j.parameter list) = function
-  | Some (op : Swagger_j.operation) ->
+let operation_val ~root:_ ~reference_base ~reference_root name (params : Swagger_t.parameter list) = function
+  | Some (op : Swagger_t.operation) ->
       let op_params = parse_parameters op.parameters in
       let params = merge_params params op_params in
       let dups = make_dups params in
       let param_sigs, param_impls =
         params
         |> List.map
-             (fun (p : Swagger_j.parameter) ->
+             (fun (p : Swagger_t.parameter) ->
                let duplicate = StringMap.find p.name dups > 1 in
                Param.create ~duplicate ~reference_base ~reference_root p)
         |> List.split in
@@ -141,7 +141,7 @@ let path_val path =
     (Val.Sig.constant "request_path_template")
     (Val.Impl.constant "request_path_template" path)
 
-let path_item_vals ~root ~reference_base ~reference_root ~path (item : Swagger_j.path_item) : Val.t list =
+let path_item_vals ~root ~reference_base ~reference_root ~path (item : Swagger_t.path_item) : Val.t list =
   let params = parse_parameters item.parameters in
   let operation_val name =
     operation_val ~root ~reference_base ~reference_root name params in
@@ -158,7 +158,7 @@ let definition_module ?(path = [])
                       ~root
                       ~reference_base
                       ~name
-                      (schema : Swagger_j.schema) =
+                      (schema : Swagger_t.schema) =
   let required = default [] schema.required in
   let properties = default [] schema.properties in
 
@@ -171,8 +171,8 @@ let definition_module ?(path = [])
   let create_params =
     List.fold_left
       (fun params (name, schema) ->
-        let s = Schema.create ~reference_base ~reference_root:root schema in
-        let param_type = Schema.to_string s in
+        let s = Codegen_schema.create ~reference_base ~reference_root:root schema in
+        let param_type = Codegen_schema.to_string s in
         let param_sig, param_impl =
           create_param name param_type required in
         (param_sig, param_impl) :: params)
@@ -180,8 +180,8 @@ let definition_module ?(path = [])
 
   let alias_type () =
     let param_type =
-      Schema.kind_to_string
-        (Schema.create ~reference_base ~reference_root:root schema) in
+      Codegen_schema.kind_to_string
+        (Codegen_schema.create ~reference_base ~reference_root:root schema) in
     let int_or_string =
       match schema.format with
       | Some "int-or-string" -> true
@@ -206,8 +206,8 @@ let definition_module ?(path = [])
     let fields, values =
       List.fold_left
         (fun (fields, values) (name, schema) ->
-          let s = Schema.create ~reference_base ~reference_root:root schema in
-          let s = Schema.to_string s in
+          let s = Codegen_schema.create ~reference_base ~reference_root:root schema in
+          let s = Codegen_schema.to_string s in
           let sig_type, impl_type =
             if List.mem name required then
               let type_ = sprintf "%s" s in
@@ -297,7 +297,7 @@ let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
 let rec build_definitions ~root ~definition_base ~reference_base l =
   match l with
   | [] -> root
-  | (name, (schema : Swagger_j.schema)) :: defs when schema.ref = None ->
+  | (name, (schema : Swagger_t.schema)) :: defs when schema.ref = None ->
       let parents_and_child =
         name
         |> Mod.strip_base definition_base
@@ -319,14 +319,14 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
   (* XXX Ignore schemas that are simply references? Just use the referenced
    * module? In the kubernetes API this seems to be only for deprecated
    * stuff. *)
-  | (_name, (_schema : Swagger_j.schema)) :: defs ->
+  | (_name, (_schema : Swagger_t.schema)) :: defs ->
       build_definitions ~root ~definition_base ~reference_base defs
 
 let of_swagger ?(path_base = "")
                ?(definition_base = "")
                ?(reference_base = "")
                ~reference_root s =
-  let open Swagger_j in
+  let open Swagger_t in
   let definitions = default [] s.definitions in
   let title = s.info.title in
   let defs =

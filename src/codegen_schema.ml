@@ -2,7 +2,7 @@ open Printf
 open Util
 
 type t =
-  { raw            : Swagger_j.schema
+  { raw            : Swagger_t.schema
   ; reference_base : string
   ; reference_root : Mod.t
   }
@@ -25,7 +25,7 @@ let rec kind_to_string t =
       | `Integer -> "int"
       | `Boolean -> "bool"
       | `Object  ->
-          let open Swagger_j in
+          let open Swagger_t in
           (match t.raw.additional_properties with
           | Some props ->
               (match props.ref, props.kind with
@@ -37,7 +37,7 @@ let rec kind_to_string t =
               | None, _ -> sprintf "(string * %s) list" (kind_to_string (create ~reference_base ~reference_root props)))
           | None -> "unit")
       | `Array   ->
-          let open Swagger_j in
+          let open Swagger_t in
           match t.raw.items with
           | Some s ->
               let s = create ~reference_base ~reference_root s in
