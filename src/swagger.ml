@@ -17,3 +17,11 @@ let codegen ~path_base
     swagger
   |> Gen.to_string
   |> fprintf output "%s\n%!"
+
+
+module Schema = struct
+ include Swagger_t
+ include Swagger_v
+end
+
+module Json = Swagger_j
