@@ -1,15 +1,15 @@
 open Printf
 open Util
 
-type t = Swagger_j.parameter
+type t = Swagger_t.parameter
 
-let rec item_kind_to_string (items : Swagger_j.items option) = function
+let rec item_kind_to_string (items : Swagger_t.items option) = function
   | `String  -> "string"
   | `Number  -> "float"
   | `Integer -> "int"
   | `Boolean -> "bool"
   | `Array   ->
-      let open Swagger_j in
+      let open Swagger_t in
       match items with
       | Some is -> item_kind_to_string is.items is.kind ^ " list"
       | None -> failwith ("item_kind_to_string: array type must have an "
@@ -23,7 +23,7 @@ let kind_to_string (p : t) =
   | `Boolean -> "bool"
   | `File -> "file"
   | `Array   ->
-      let open Swagger_j in
+      let open Swagger_t in
       match p.items with
       | Some items -> item_kind_to_string items.items items.kind ^ " array"
       | None -> failwith ("Param.kind_to_string: array type must have an "
@@ -69,8 +69,8 @@ let create ?(duplicate = false) ~reference_base ~reference_root (p : t) =
   let t =
     match p.location with
     | `Body ->
-        Schema.create ~reference_base ~reference_root (some p.schema)
-        |> Schema.to_string
+        Codegen_schema.create ~reference_base ~reference_root (some p.schema)
+        |> Codegen_schema.to_string
     | _     ->
         kind_to_string p in
   let n =

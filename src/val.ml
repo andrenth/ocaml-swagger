@@ -129,7 +129,7 @@ module Impl = struct
     | Derived
 
   type origin =
-    { location : Swagger_j.location
+    { location : Swagger_t.location
     ; orig_name : string
     }
 
@@ -146,7 +146,7 @@ module Impl = struct
   let module_ name = Module name
   let type_ name = Type name
 
-  let origin (p : Swagger_j.parameter) =
+  let origin (p : Swagger_t.parameter) =
     { location = p.location; orig_name = p.name }
 
   let named ?origin name type_ =
