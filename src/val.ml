@@ -49,6 +49,9 @@ module Sig = struct
   let pure ?descr name params ret =
     create ?descr Pure name params (Simple ret)
 
+  let field_setter ?descr name params ret =
+    create ?descr Pure ("set_" ^ name) params (Simple ret)
+
   (* Here "constants" are actually [unit -> string] functions to satisfy
    * OCaml's recusive module safety requirements.
    *
@@ -118,7 +121,8 @@ module Impl = struct
 
   type kind =
     | Record_constructor
-    | Record_accessor
+    | Field_getter
+    | Field_setter
     | Identity
     | Constant of string
     | Http_request of http_verb * return
@@ -163,7 +167,8 @@ module Impl = struct
   let create kind name params = { kind; name; params }
 
   let record_constructor = create Record_constructor
-  let record_accessor = create Record_accessor
+  let field_getter = create Field_getter
+  let field_setter = create Field_setter
   let identity = create Identity
   let constant name value =
     create (Constant value) name [positional "()" "unit"]
@@ -405,7 +410,8 @@ module Impl = struct
     let pad = String.make indent ' ' in
     match t.kind with
     | Record_constructor -> record_constructor_body ~pad t.params
-    | Record_accessor -> sprintf "%st.%s" pad t.name
+    | Field_getter -> sprintf "%st.%s" pad t.name
+    | Field_setter -> sprintf "%s{ t with %s }" pad t.name
     | Identity -> sprintf "%st" pad
     | Constant v -> sprintf "%s\"%s\"" pad v
     | Http_request (Get, return) -> http_get ~pad ~return t.params
@@ -442,6 +448,10 @@ module Impl = struct
           params @ [ctx; headers; uri]
       | _ ->
           params in
+    let name =
+      match kind with
+      | Field_setter -> "set_" ^ name
+      | _ -> name in
     match kind with
     | Derived -> ""
     | _ ->

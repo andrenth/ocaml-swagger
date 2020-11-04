@@ -221,12 +221,17 @@ let definition_module ?(path = [])
               ~name:pname
               ~orig_name:name
               ~type_:impl_type in
-          let value =
+          let field_getter =
             let descr = schema.description in
             Val.create
               (Val.Sig.pure ?descr pname [Val.Sig.positional "t"] sig_type)
-              (Val.Impl.record_accessor pname [Val.Impl.positional "t" "t"]) in
-          (field :: fields, value :: values))
+              (Val.Impl.field_getter pname [Val.Impl.positional "t" "t"]) in
+          let field_setter =
+            let descr = "Set the value of the " ^ pname ^ " field." in
+            Val.create
+              (Val.Sig.field_setter ~descr pname [Val.Sig.positional sig_type; Val.Sig.positional "t"] "t")
+              (Val.Impl.field_setter pname [Val.Impl.positional pname sig_type; Val.Impl.positional "t" "t"]) in
+          (field :: fields, field_setter :: field_getter :: values))
         ([], [])
         properties in
     let values = create :: List.rev values in
