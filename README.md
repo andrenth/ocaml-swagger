@@ -39,6 +39,7 @@ let () =
     ~definition_base:"io.k8s."
     ~reference_base:"#/definitions/io.k8s."
     ~reference_root:"Definitions"
+    ()
 ```
 
 This call instructs OCaml-Swagger to read the API specification from the file
