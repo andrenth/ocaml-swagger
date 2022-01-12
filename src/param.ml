@@ -17,7 +17,7 @@ let rec item_kind_to_string (items : Swagger_t.items option) = function
             ("item_kind_to_string: array type must have an " ^ "'items' field"))
 
 let kind_to_string (p : t) =
-  match some p.kind with
+  match Option.get p.kind with
   | `String -> "string"
   | `Number -> "float"
   | `Integer -> "int"
@@ -60,7 +60,8 @@ let create ?(duplicate = false) ~reference_base ~reference_root (p : t) =
   let t =
     match p.location with
     | `Body ->
-        Codegen_schema.create ~reference_base ~reference_root (some p.schema)
+        Codegen_schema.create ~reference_base ~reference_root
+          (Option.get p.schema)
         |> Codegen_schema.to_string
     | _ -> kind_to_string p
   in

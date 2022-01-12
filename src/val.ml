@@ -288,8 +288,8 @@ module Impl = struct
     | [] -> "None"
     | [ p ] ->
         let to_yojson =
-          param_type p |> String.split_on_char '.' |> unsnoc |> some |> fst
-          |> String.concat "." |> sprintf "%s.to_yojson"
+          param_type p |> String.split_on_char '.' |> unsnoc |> Option.get
+          |> fst |> String.concat "." |> sprintf "%s.to_yojson"
         in
         String.trim
         @@ sprintf {| Some (Body.of_string (Yojson.Safe.to_string (%s %s))) |}
