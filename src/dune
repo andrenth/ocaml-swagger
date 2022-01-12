@@ -13,4 +13,22 @@
 (library
  (name swagger)
  (public_name swagger)
- (libraries atdgen re.pcre yojson))
+ (libraries atdgen re.pcre yojson)
+ (modules
+  Gen
+  Mod
+  Param
+  Codegen_schema
+  Swagger
+  Swagger_j
+  Swagger_t
+  Swagger_util
+  Type
+  Util
+  Val))
+
+(executable
+ (name main)
+ (public_name ocaml-swagger)
+ (libraries swagger)
+ (modules main))
