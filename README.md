@@ -27,6 +27,19 @@ $ opam install swagger
 
 ## Usage
 
+Use the `ocaml-swagger` executable:
+
+``` shell
+ocaml-swagger [-o <output>] [<input>]
+  -path  Path base
+  -definition  Definition base
+  -reference-base  Reference base
+  -reference-root  Reference root
+  -o  Set output file name
+  -help  Display this list of options
+  --help  Display this list of options
+```
+
 Most users will probably only need to use the `Swagger.codegen_from_file`
 function to parse an API specification and generate the OCaml code:
 
