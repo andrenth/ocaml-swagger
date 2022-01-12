@@ -53,7 +53,7 @@ module Sig = struct
     create ?descr Pure ("set_" ^ name) params (Simple ret)
 
   (* Here "constants" are actually [unit -> string] functions to satisfy
-   * OCaml's recusive module safety requirements.
+   * OCaml's recursive module safety requirements.
    *
    * See https://stackoverflow.com/q/4239045 *)
   let constant name =

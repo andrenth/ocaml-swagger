@@ -42,7 +42,7 @@ module Impl : sig
       repersent either integers or strings. This is defined in the Swagger
       specification as a ["string"] type having an ["int-or-string"] format.
       The generated JSON conversion functions will attempt to produce an
-      integer value if the string repersents a valid integer. *)
+      integer value if the string represents a valid integer. *)
 
   val record : string -> record_field list -> t
   val unspecified : string -> t
