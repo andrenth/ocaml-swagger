@@ -111,7 +111,6 @@ module Impl = struct
     | Identity
     | Constant of string
     | Http_request of http_verb * return
-    | Derived
 
   type origin = { location : Swagger_t.location; orig_name : string }
   type param_data = { name : string; type_ : string }
@@ -156,18 +155,6 @@ module Impl = struct
     | Optional (_, Some origin) -> Some origin.location
     | Optional (_, None) -> None
     | Positional _ -> None
-
-  [@@@ocaml.warning "-32"]
-
-  let param_orig_name = function
-    | Named (_, Some origin) -> Some origin.orig_name
-    | Optional (_, Some origin) -> Some origin.orig_name
-    | Named (_, None) | Optional (_, None) | Positional _ -> None
-
-  let derived = create Derived "" []
-  let is_optional = function Optional _ -> true | _ -> false
-
-  [@@@end]
 
   let http_verb_of_string = function
     | "get" -> Get
@@ -395,8 +382,6 @@ module Impl = struct
     | Http_request (Head, return) -> http_head ~pad ~return t.params
     | Http_request (Patch, return) -> http_patch ~pad ~return t.params
     | Http_request (Options, return) -> http_options ~pad ~return t.params
-    | Derived ->
-        failwith "Val.Impl.body_to_string: derived functions have no body"
 
   let param_to_string = function
     | Named (p, _) -> sprintf "~%s" p.name
@@ -425,11 +410,8 @@ module Impl = struct
       | _ -> params
     in
     let name = match kind with Field_setter -> "set_" ^ name | _ -> name in
-    match kind with
-    | Derived -> ""
-    | _ ->
-        sprintf "%slet %s %s=\n%s\n" pad name (params_to_string params)
-          (body_to_string ~indent:(indent + 2) value)
+    sprintf "%slet %s %s=\n%s\n" pad name (params_to_string params)
+      (body_to_string ~indent:(indent + 2) value)
 end
 
 type t = { signature : Sig.t; implementation : Impl.t }

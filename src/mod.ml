@@ -40,29 +40,12 @@ let with_values name ?(recursive = false) ?(path = []) values =
 
 let name m = m.name
 let submodules m = m.submodules |> StringMap.bindings |> List.map snd
-
-(* Unused values. *)
-[@@@ocaml.warning "-32"]
-
-let add_type t m = { m with types = t :: m.types }
-let add_val v m = { m with values = v :: m.values }
-let add_types ts m = { m with types = m.types @ ts }
-let map_submodules f m = { m with submodules = StringMap.map f m.submodules }
-
-[@@@end]
-
-let has_submodules m = StringMap.is_empty m.submodules
 let add_vals vs m = { m with values = m.values @ vs }
 
 let add_mod subm m =
   { m with submodules = StringMap.add subm.name subm m.submodules }
 
 let find_submodule name m = StringMap.find_opt (module_name name) m.submodules
-
-let iter f m =
-  f m;
-  StringMap.iter (fun _name sub -> f sub) m.submodules
-
 let path m = m.path
 
 let qualified_name m =

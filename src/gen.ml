@@ -7,17 +7,6 @@ module StringSet = Set.Make (struct
   let compare = compare
 end)
 
-(* Unused types. *)
-[@@@ocaml.warning "-34"]
-
-type parameter_or_reference =
-  [ `Parameter of Swagger_t.parameter | `Reference of Swagger_t.reference ]
-
-type response_or_reference =
-  [ `Response of Swagger_t.response | `Reference of Swagger_t.reference ]
-
-[@@@end]
-
 let merge_params (ps1 : Swagger_t.parameter list)
     (ps2 : Swagger_t.parameter list) =
   let rec merge acc = function
@@ -274,16 +263,6 @@ let rec insert_module m root = function
       | None ->
           let subm = Mod.empty p ~path:(Mod.qualified_path root) () in
           Mod.add_mod (insert_module m subm ps) root)
-
-(* Unused values. *)
-[@@@ocaml.warning "-32"]
-
-let remove_base base segments =
-  match (base, segments) with
-  | Some base, s :: ss when base = s -> ss
-  | _ -> segments
-
-[@@@end]
 
 let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
   | [] -> root
