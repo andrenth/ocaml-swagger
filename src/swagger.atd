@@ -1,4 +1,4 @@
-type json <ocaml module="Yojson.Safe"> = abstract
+type t <ocaml module="Yojson.Safe"> = abstract
 
 type contact =
   { ?name : string option
@@ -73,7 +73,7 @@ type items =
   ; ?format : string option
   ; ?items : items option
   ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
-  ; ?default : json option
+  ; ?default : t option
   ; ?maximum : int option
   ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
   ; ?minimum : int option
@@ -84,7 +84,7 @@ type items =
   ; ?max_items <json name="maxItems"> : int option
   ; ?min_items <json name="minItems"> : int option
   ; ?unique_items <json name="uniqueItems"> : bool option
-  ; ?enum : json list option
+  ; ?enum : t list option
   ; ?multiple_of <json name="multipleOf"> : int option
   }
 
@@ -107,7 +107,7 @@ type schema =
   ; ?format : string option
   ; ?title : string option
   ; ?description : string option
-  ; ?default : json option
+  ; ?default : t option
   ; ?multiple_of <json name="multipleOf"> : int option
   ; ?maximum : int option
   ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
@@ -122,17 +122,17 @@ type schema =
   ; ?max_properties <json name="maxProperties"> : int option
   ; ?min_properties <json name="minProperties"> : int option
   ; ?required : string list option
-  ; ?enum : json list option
+  ; ?enum : t list option
   ; ?kind <json name="type"> : schema_kind option
   ; ?items : schema option
-  ; ?all_of <json name="allOf"> : json option
+  ; ?all_of <json name="allOf"> : t option
   ; ?properties : (string * schema) list <json repr="object"> option
   ; ?additional_properties <json name="additionalProperties"> : schema <json repr="object"> option
   ; ?discriminator : string option
   ; ~read_only <json name="readOnly"> <ocaml default="false"> : bool
   ; ?xml : xml option
   ; ?external_docs : external_documentation option
-  ; ?example : json option
+  ; ?example : t option
   }
 
 type parameter =
@@ -146,7 +146,7 @@ type parameter =
   ; ~allow_empty_value <json name="allowEmptyValue"> <ocaml default="false"> : bool
   ; ?items : items option
   ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
-  ; ?default : json option
+  ; ?default : t option
   ; ?maximum : int option
   ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
   ; ?minimum : int option
@@ -157,7 +157,7 @@ type parameter =
   ; ?max_items <json name="maxItems"> : int option
   ; ?min_items <json name="minItems"> : int option
   ; ?unique_items <json name="uniqueItems"> : bool option
-  ; ?enum : json list option
+  ; ?enum : t list option
   ; ?multiple_of <json name="multipleOf"> : int option
   }
 
@@ -169,7 +169,7 @@ type header =
   ; ?format : string option
   ; ?items : items option
   ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
-  ; ?default : json option
+  ; ?default : t option
   ; ?maximum : int option
   ; ?exclusive_maximum <json name="exclusiveMaximum"> : bool option
   ; ?minimum : int option
@@ -180,13 +180,13 @@ type header =
   ; ?max_items <json name="maxItems"> : int option
   ; ?min_items <json name="minItems"> : int option
   ; ?unique_items <json name="uniqueItems"> : bool option
-  ; ?enum : json list option
+  ; ?enum : t list option
   ; ?multiple_of <json name="multipleOf"> : int option
   }
 
 type headers = (string * header) list <json repr="object">
 
-type example = (string * json) list <json repr="object">
+type example = (string * t) list <json repr="object">
 
 type response =
   { description : string
@@ -199,7 +199,7 @@ type responses_definitions = (string * response) list <json repr="object">
 
 type reference <ocaml valid="Swagger_util.Validate.url"> = string
 
-type responses = (string * json) list <json repr="object">
+type responses = (string * t) list <json repr="object">
 
 type operation =
   { ?tags : string list option
@@ -209,7 +209,7 @@ type operation =
   ; ?operation_id <json name="operationId"> : string option
   ; ?consumes : string list option (* validate mime? *)
   ; ?produces : string list option (* validate mime? *)
-  ; ?parameters : json list option
+  ; ?parameters : t list option
   ; responses : responses
   ; ?schemes : scheme list option
   ; ~deprecated <ocaml default="false"> : bool
@@ -225,7 +225,7 @@ type path_item =
   ; ?options : operation option
   ; ?head : operation option
   ; ?patch : operation option
-  ; ?parameters : json list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
+  ; ?parameters : t list option (* validate : uniqueness, only one body, required must be true if in is "path", schema only present if in is "body" *)
   }
 
 type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">
