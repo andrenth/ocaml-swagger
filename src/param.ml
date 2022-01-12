@@ -41,14 +41,6 @@ let name n =
   let n = snake_case n |> String.lowercase_ascii in
   if is_keyword n then n ^ "_" else n
 
-(* Unused values. *)
-[@@@ocaml.warning "-32"]
-
-let prefix_strings required = if required then ("", "~") else ("?", "?")
-let kind = function true -> `Named | false -> `Optional
-
-[@@@end]
-
 let string_of_location = function
   | `Query -> "query"
   | `Header -> "header"
