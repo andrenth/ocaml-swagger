@@ -1,5 +1,4 @@
 open Printf
-open Util
 
 type t = {
   raw : Swagger_t.schema;
@@ -18,7 +17,7 @@ let rec kind_to_string t =
   match t.raw.ref with
   | Some r -> Mod.reference_type ~reference_base ~reference_root r
   | None -> (
-      match some t.raw.kind with
+      match Option.get t.raw.kind with
       | `String -> "string"
       | `Number -> "float"
       | `Integer -> "int"

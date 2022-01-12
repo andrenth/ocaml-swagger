@@ -1,8 +1,6 @@
 open Printf
 open Util
 
-let default z = function Some x -> x | None -> z
-
 module StringSet = Set.Make (struct
   type t = string
 
@@ -153,8 +151,8 @@ let path_item_vals ~root ~reference_base ~reference_root ~path
 
 let definition_module ?(path = []) ~root ~reference_base ~name
     (schema : Swagger_t.schema) =
-  let required = default [] schema.required in
-  let properties = default [] schema.properties in
+  let required = Option.value ~default:[] schema.required in
+  let properties = Option.value ~default:[] schema.properties in
 
   let create_param name type_ required_params =
     let n = Param.name name in
@@ -341,7 +339,7 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
 let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "")
     ~reference_root s =
   let open Swagger_t in
-  let definitions = default [] s.definitions in
+  let definitions = Option.value ~default:[] s.definitions in
   let title = s.info.title in
   let defs =
     build_definitions
