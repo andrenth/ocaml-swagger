@@ -1,7 +1,6 @@
 (lang dune 3.4)
 
 (name swagger)
-(formatting disabled)
 (generate_opam_files true)
 
 (source (github andrenth/ocaml-swagger))
