@@ -14,10 +14,8 @@ module Sig : sig
       if provided. *)
 
   val unspecified : ?descr:string -> string -> t
-
   val to_string : ?indent:int -> t -> string
 end
-
 
 (** {1 Implementation types} *)
 
@@ -28,10 +26,8 @@ module Impl : sig
   type record_field
   (** The type of record fields. *)
 
-  val record_field : name:string
-                  -> orig_name:string
-                  -> type_:string
-                  -> record_field
+  val record_field :
+    name:string -> orig_name:string -> type_:string -> record_field
 
   (** Constructor function for record fields. *)
 
@@ -46,10 +42,8 @@ module Impl : sig
 
   val record : string -> record_field list -> t
   val unspecified : string -> t
-
   val to_string : ?indent:int -> t -> string
 end
-
 
 (** {1 Type declarations} *)
 

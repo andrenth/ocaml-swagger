@@ -1,12 +1,14 @@
 (rule
  (targets swagger_j.ml swagger_j.mli)
- (deps    swagger.atd)
- (action  (run atdgen -j %{deps})))
+ (deps swagger.atd)
+ (action
+  (run atdgen -j %{deps})))
 
 (rule
  (targets swagger_t.ml swagger_t.mli)
- (deps    swagger.atd)
- (action  (run atdgen -t %{deps})))
+ (deps swagger.atd)
+ (action
+  (run atdgen -t %{deps})))
 
 (library
  (name swagger)
