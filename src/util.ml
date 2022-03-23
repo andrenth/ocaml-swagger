@@ -3,7 +3,8 @@ open Printf
 let snake_case =
   let re1 = Re.Pcre.regexp "([A-Z]+)([A-Z][a-z]{2,})" in
   let re2 = Re.Pcre.regexp "([a-z0-9])([A-Z])" in
-  let re3 = Re.compile (Re.Pcre.re "-") in
+  let re3 = Re.Pcre.regexp "-| " in
+  let re4 = Re.Pcre.regexp "^\\." in
   let underscore re s =
     let replace groups =
       sprintf "%s_%s" (Re.Group.get groups 1) (Re.Group.get groups 2)
@@ -16,6 +17,7 @@ let snake_case =
       let s = underscore re1 s in
       let s = underscore re2 s in
       let s = Re.replace_string re3 ~by:"_" s in
+      let s = Re.replace_string re4 ~by:"dot_" s in
       sprintf "%c" s.[0]
       ^ String.lowercase_ascii (String.sub s 1 (String.length s - 1))
     else s
