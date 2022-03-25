@@ -2,14 +2,19 @@ module Sig : sig
   type t
   type param
 
-  val named : ?descr:string -> string -> string -> param
-  val optional : ?descr:string -> string -> string -> param
-  val positional : string -> param
+  val labelled : ?descr:string -> string -> Ppxlib.Ast.core_type -> param
+  val optional : ?descr:string -> string -> Ppxlib.Ast.core_type -> param
+  val nolabel : Ppxlib.Ast.core_type -> param
   val constant : string -> t
-  val pure : ?descr:string -> string -> param list -> string -> t
-  val field_setter : ?descr:string -> string -> param list -> string -> t
-  val http_request : ?descr:string -> string -> param list -> string -> t
-  val to_string : ?indent:int -> t -> string
+  val pure : ?descr:string -> string -> param list -> Ppxlib.Ast.core_type -> t
+
+  val field_setter :
+    ?descr:string -> string -> param list -> Ppxlib.Ast.core_type -> t
+
+  val http_request :
+    ?descr:string -> string -> param list -> Ppxlib.Ast.core_type -> t
+
+  val to_sig : t -> Ppxlib.Ast.value_description
 end
 
 module Impl : sig
@@ -19,9 +24,9 @@ module Impl : sig
   type http_verb
   type return
 
-  val named : ?origin:origin -> string -> string -> param
-  val optional : ?origin:origin -> string -> string -> param
-  val positional : string -> string -> param
+  val labelled : ?origin:origin -> string -> Ppxlib.Ast.core_type -> param
+  val optional : ?origin:origin -> string -> Ppxlib.Ast.core_type -> param
+  val nolabel : string -> Ppxlib.Ast.core_type -> param
   val constant : string -> string -> t
   val identity : string -> param list -> t
   val record_constructor : string -> param list -> t
@@ -31,8 +36,8 @@ module Impl : sig
   val origin : Swagger_t.parameter -> origin
   val http_verb_of_string : string -> http_verb
   val module_ : string -> return
-  val type_ : string -> return
-  val to_string : ?indent:int -> t -> string
+  val type_ : Ppxlib.Ast.core_type -> return
+  val to_impl : t -> Ppxlib.Ast.structure_item
 end
 
 type t

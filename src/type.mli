@@ -14,7 +14,7 @@ module Sig : sig
       if provided. *)
 
   val unspecified : ?descr:string -> string -> t
-  val to_string : ?indent:int -> t -> string
+  val to_sig : t -> Ppxlib.Ast.type_declaration
 end
 
 (** {1 Implementation types} *)
@@ -27,11 +27,14 @@ module Impl : sig
   (** The type of record fields. *)
 
   val record_field :
-    name:string -> orig_name:string -> type_:string -> record_field
+    name:string ->
+    orig_name:string ->
+    type_:Ppxlib.Ast.core_type ->
+    record_field
 
   (** Constructor function for record fields. *)
 
-  val alias : ?int_or_string:bool -> string -> string -> t
+  val alias : ?int_or_string:bool -> string -> Ppxlib.Ast.core_type -> t
   (** Defines an alias type to be generated in an implementation.
 
       The optional [int_or_string] flag can be passed for aliases that can
@@ -42,7 +45,7 @@ module Impl : sig
 
   val record : string -> record_field list -> t
   val unspecified : string -> t
-  val to_string : ?indent:int -> t -> string
+  val to_impl : t -> Ppxlib.Ast.structure
 end
 
 (** {1 Type declarations} *)

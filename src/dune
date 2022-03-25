@@ -13,7 +13,9 @@
 (library
  (name swagger)
  (public_name swagger)
- (libraries atdgen re.pcre yojson)
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries atdgen ppxlib re.pcre yojson)
  (modules
   Gen
   Mod

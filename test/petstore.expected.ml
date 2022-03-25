@@ -55,17 +55,20 @@ module rec Swagger_petstore : sig
       val code : t -> int option
 
       val set_code : int option -> t -> t
-      (** Set the value of the code field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the code field.|ocamlswagger}]
 
       val type_ : t -> string option
 
       val set_type_ : string option -> t -> t
-      (** Set the value of the type_ field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the type_ field.|ocamlswagger}]
 
       val message : t -> string option
 
       val set_message : string option -> t -> t
-      (** Set the value of the message field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the message field.|ocamlswagger}]
 
       module Object : Object.S with type value := t
     end
@@ -77,12 +80,13 @@ module rec Swagger_petstore : sig
       val id : t -> int option
 
       val set_id : int option -> t -> t
-      (** Set the value of the id field. *)
+        [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val name : t -> string option
 
       val set_name : string option -> t -> t
-      (** Set the value of the name field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the name field.|ocamlswagger}]
 
       module Object : Object.S with type value := t
     end
@@ -103,33 +107,38 @@ module rec Swagger_petstore : sig
       val id : t -> int option
 
       val set_id : int option -> t -> t
-      (** Set the value of the id field. *)
+        [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val pet_id : t -> int option
 
       val set_pet_id : int option -> t -> t
-      (** Set the value of the pet_id field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the pet_id field.|ocamlswagger}]
 
       val quantity : t -> int option
 
       val set_quantity : int option -> t -> t
-      (** Set the value of the quantity field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the quantity field.|ocamlswagger}]
 
       val ship_date : t -> string option
 
       val set_ship_date : string option -> t -> t
-      (** Set the value of the ship_date field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the ship_date field.|ocamlswagger}]
 
       val status : t -> string option
-      (** Order Status *)
+        [@@ocaml.doc {ocamlswagger|Order Status|ocamlswagger}]
 
       val set_status : string option -> t -> t
-      (** Set the value of the status field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the status field.|ocamlswagger}]
 
       val complete : t -> bool option
 
       val set_complete : bool option -> t -> t
-      (** Set the value of the complete field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the complete field.|ocamlswagger}]
 
       module Object : Object.S with type value := t
     end
@@ -150,34 +159,39 @@ module rec Swagger_petstore : sig
       val id : t -> int option
 
       val set_id : int option -> t -> t
-      (** Set the value of the id field. *)
+        [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val category : t -> Swagger_petstore.Definitions.Category.t option
 
       val set_category :
         Swagger_petstore.Definitions.Category.t option -> t -> t
-      (** Set the value of the category field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the category field.|ocamlswagger}]
 
       val name : t -> string
 
       val set_name : string -> t -> t
-      (** Set the value of the name field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the name field.|ocamlswagger}]
 
       val photo_urls : t -> string list
 
       val set_photo_urls : string list -> t -> t
-      (** Set the value of the photo_urls field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the photo_urls field.|ocamlswagger}]
 
       val tags : t -> Swagger_petstore.Definitions.Tag.t list option
 
       val set_tags : Swagger_petstore.Definitions.Tag.t list option -> t -> t
-      (** Set the value of the tags field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the tags field.|ocamlswagger}]
 
       val status : t -> string option
-      (** pet status in the store *)
+        [@@ocaml.doc {ocamlswagger|pet status in the store|ocamlswagger}]
 
       val set_status : string option -> t -> t
-      (** Set the value of the status field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the status field.|ocamlswagger}]
 
       module Object : Object.S with type value := t
     end
@@ -189,12 +203,13 @@ module rec Swagger_petstore : sig
       val id : t -> int option
 
       val set_id : int option -> t -> t
-      (** Set the value of the id field. *)
+        [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val name : t -> string option
 
       val set_name : string option -> t -> t
-      (** Set the value of the name field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the name field.|ocamlswagger}]
 
       module Object : Object.S with type value := t
     end
@@ -217,43 +232,50 @@ module rec Swagger_petstore : sig
       val id : t -> int option
 
       val set_id : int option -> t -> t
-      (** Set the value of the id field. *)
+        [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val username : t -> string option
 
       val set_username : string option -> t -> t
-      (** Set the value of the username field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the username field.|ocamlswagger}]
 
       val first_name : t -> string option
 
       val set_first_name : string option -> t -> t
-      (** Set the value of the first_name field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the first_name field.|ocamlswagger}]
 
       val last_name : t -> string option
 
       val set_last_name : string option -> t -> t
-      (** Set the value of the last_name field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the last_name field.|ocamlswagger}]
 
       val email : t -> string option
 
       val set_email : string option -> t -> t
-      (** Set the value of the email field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the email field.|ocamlswagger}]
 
       val password : t -> string option
 
       val set_password : string option -> t -> t
-      (** Set the value of the password field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the password field.|ocamlswagger}]
 
       val phone : t -> string option
 
       val set_phone : string option -> t -> t
-      (** Set the value of the phone field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the phone field.|ocamlswagger}]
 
       val user_status : t -> int option
-      (** User Status *)
+        [@@ocaml.doc {ocamlswagger|User Status|ocamlswagger}]
 
       val set_user_status : int option -> t -> t
-      (** Set the value of the user_status field. *)
+        [@@ocaml.doc
+          {ocamlswagger|Set the value of the user_status field.|ocamlswagger}]
 
       module Object : Object.S with type value := t
     end
@@ -269,9 +291,9 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (Swagger_petstore.Definitions.Pet.t list, string) result Lwt.t
-      (** Multiple status values can be provided with comma separated strings
-
-          @param status Status values that need to be considered for filter *)
+        [@@ocaml.doc
+          {ocamlswagger|Multiple status values can be provided with comma separated strings
+@param status Status values that need to be considered for filter|ocamlswagger}]
     end
 
     module Find_by_tags : sig
@@ -283,9 +305,9 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (Swagger_petstore.Definitions.Pet.t list, string) result Lwt.t
-      (** Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing.
-
-          @param tags Tags to filter by *)
+        [@@ocaml.doc
+          {ocamlswagger|Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing.
+@param tags Tags to filter by|ocamlswagger}]
     end
 
     val request_path_template : unit -> string
@@ -296,9 +318,9 @@ module rec Swagger_petstore : sig
       ?headers:Cohttp.Header.t ->
       Uri.t ->
       (unit, string) result Lwt.t
-    (** 
-
-        @param body Pet object that needs to be added to the store *)
+      [@@ocaml.doc
+        {ocamlswagger|
+@param body Pet object that needs to be added to the store|ocamlswagger}]
 
     val post :
       body:Swagger_petstore.Definitions.Pet.t ->
@@ -306,9 +328,9 @@ module rec Swagger_petstore : sig
       ?headers:Cohttp.Header.t ->
       Uri.t ->
       (unit, string) result Lwt.t
-    (** 
-
-        @param body Pet object that needs to be added to the store *)
+      [@@ocaml.doc
+        {ocamlswagger|
+@param body Pet object that needs to be added to the store|ocamlswagger}]
   end
 
   module Store : sig
@@ -320,7 +342,8 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (Object.Of_ints.t, string) result Lwt.t
-      (** Returns a map of status codes to quantities *)
+        [@@ocaml.doc
+          {ocamlswagger|Returns a map of status codes to quantities|ocamlswagger}]
     end
 
     module Order : sig
@@ -332,9 +355,9 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (Swagger_petstore.Definitions.Order.t, string) result Lwt.t
-      (** 
-
-          @param body order placed for purchasing the pet *)
+        [@@ocaml.doc
+          {ocamlswagger|
+@param body order placed for purchasing the pet|ocamlswagger}]
     end
   end
 
@@ -348,9 +371,9 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (unit, string) result Lwt.t
-      (** 
-
-          @param body List of user object *)
+        [@@ocaml.doc
+          {ocamlswagger|
+@param body List of user object|ocamlswagger}]
     end
 
     module Create_with_list : sig
@@ -362,9 +385,9 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (unit, string) result Lwt.t
-      (** 
-
-          @param body List of user object *)
+        [@@ocaml.doc
+          {ocamlswagger|
+@param body List of user object|ocamlswagger}]
     end
 
     module Login : sig
@@ -377,11 +400,10 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (string, string) result Lwt.t
-      (** 
-
-          @param username The user name for login
-
-          @param password The password for login in clear text *)
+        [@@ocaml.doc
+          {ocamlswagger|
+@param username The user name for login
+@param password The password for login in clear text|ocamlswagger}]
     end
 
     module Logout : sig
@@ -392,7 +414,7 @@ module rec Swagger_petstore : sig
         ?headers:Cohttp.Header.t ->
         Uri.t ->
         (unit, string) result Lwt.t
-      (**  *)
+        [@@ocaml.doc {ocamlswagger||ocamlswagger}]
     end
 
     val request_path_template : unit -> string
@@ -403,9 +425,9 @@ module rec Swagger_petstore : sig
       ?headers:Cohttp.Header.t ->
       Uri.t ->
       (unit, string) result Lwt.t
-    (** This can only be done by the logged in user.
-
-        @param body Created user object *)
+      [@@ocaml.doc
+        {ocamlswagger|This can only be done by the logged in user.
+@param body Created user object|ocamlswagger}]
   end
 end = struct
   module Definitions = struct
@@ -589,7 +611,7 @@ end = struct
         let open Cohttp in
         let open Cohttp_lwt_unix in
         let module Body = Cohttp_lwt.Body in
-        let query = [ ("status", string_of_string array status) ] in
+        let query = [ ("status", String.concat "," (Array.to_list status)) ] in
         let path =
           let open Printf in
           let path_params = [] in
@@ -611,7 +633,10 @@ end = struct
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
-           Ok (Swagger_petstore.Definitions.Pet.t list_of_string body)
+           Ok
+             (let open Yojson.Safe in
+             Util.convert_each Swagger_petstore.Definitions.Pet.t_of_yojson
+               (from_string body))
           else Error (string_of_int code))
     end
 
@@ -623,7 +648,7 @@ end = struct
         let open Cohttp in
         let open Cohttp_lwt_unix in
         let module Body = Cohttp_lwt.Body in
-        let query = [ ("tags", string_of_string array tags) ] in
+        let query = [ ("tags", String.concat "," (Array.to_list tags)) ] in
         let path =
           let open Printf in
           let path_params = [] in
@@ -645,7 +670,10 @@ end = struct
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
-           Ok (Swagger_petstore.Definitions.Pet.t list_of_string body)
+           Ok
+             (let open Yojson.Safe in
+             Util.convert_each Swagger_petstore.Definitions.Pet.t_of_yojson
+               (from_string body))
           else Error (string_of_int code))
     end
 
@@ -755,7 +783,7 @@ end = struct
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
-           Ok (Object.Of_ints.t_of_string body)
+           Ok (Object.Of_ints.t_of_yojson (Yojson.Safe.from_string body))
           else Error (string_of_int code))
     end
 
@@ -796,7 +824,7 @@ end = struct
         let json = Yojson.Safe.from_string body in
         Lwt.return
           (if code >= 200 && code < 300 then
-           Swagger_petstore.Definitions.Order.t_of_yojson json
+           Ok (Swagger_petstore.Definitions.Order.t_of_yojson json)
           else Error body)
     end
   end
@@ -831,7 +859,9 @@ end = struct
             (Some
                (Body.of_string
                   (Yojson.Safe.to_string
-                     (Swagger_petstore.Definitions.User.yojson_of_t body))))
+                     (`List
+                       (List.map Swagger_petstore.Definitions.User.yojson_of_t
+                          body)))))
           uri
         >>= fun (resp, body) ->
         let code = resp |> Response.status |> Code.code_of_status in
@@ -871,7 +901,9 @@ end = struct
             (Some
                (Body.of_string
                   (Yojson.Safe.to_string
-                     (Swagger_petstore.Definitions.User.yojson_of_t body))))
+                     (`List
+                       (List.map Swagger_petstore.Definitions.User.yojson_of_t
+                          body)))))
           uri
         >>= fun (resp, body) ->
         let code = resp |> Response.status |> Code.code_of_status in

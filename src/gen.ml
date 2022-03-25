@@ -1,12 +1,6 @@
 open Printf
 open Util
 
-module StringSet = Set.Make (struct
-  type t = string
-
-  let compare = compare
-end)
-
 let merge_params (ps1 : Swagger_t.parameter list)
     (ps2 : Swagger_t.parameter list) =
   let rec merge acc = function
@@ -22,7 +16,9 @@ let merge_params (ps1 : Swagger_t.parameter list)
 
 let reference_module_and_type ~reference_base ~reference_root r =
   let ref_module = Mod.reference_module ~reference_base ~reference_root r in
-  let ref_type = sprintf "%s.t" ref_module in
+  let ref_type =
+    Ast_builder.(ptyp_constr (Located.lident (sprintf "%s.t" ref_module)) [])
+  in
   (Some ref_module, ref_type)
 
 let parse_or_reference f json =
@@ -41,12 +37,12 @@ let parse_responses = List.map (fun (s, r) -> (s, parse_response r))
 
 let resp_type ~reference_base ~reference_root (resp : Swagger_t.response) =
   match resp.schema with
-  | None -> (None, "unit")
+  | None -> (None, Ppxlib.([%type: unit]))
   | Some s -> (
       let s = Codegen_schema.create ~reference_base ~reference_root s in
       match Codegen_schema.reference s with
       | Some r -> reference_module_and_type ~reference_base ~reference_root r
-      | None -> (None, Codegen_schema.to_string s))
+      | None -> (None, Codegen_schema.to_type s))
 
 let rec return_type ~reference_root ~reference_base
     (resps : Swagger_t.responses) =
@@ -60,7 +56,7 @@ let rec return_type ~reference_root ~reference_base
     r1.schema = r2.schema
   in
   match resps with
-  | [] -> (None, "unit")
+  | [] -> (None, Ppxlib.([%type: unit]))
   | (code, _) :: rs when is_error code ->
       (* ignore errors; assume strings *)
       return_type ~reference_root ~reference_base rs
@@ -146,7 +142,7 @@ let definition_module ?(path = []) ~root ~reference_base ~name
   let create_param name type_ required_params =
     let n = Param.name name in
     if List.mem name required_params then
-      (Val.Sig.named n type_, Val.Impl.named n type_)
+      (Val.Sig.labelled n type_, Val.Impl.labelled n type_)
     else (Val.Sig.optional n type_, Val.Impl.optional n type_)
   in
 
@@ -156,7 +152,7 @@ let definition_module ?(path = []) ~root ~reference_base ~name
         let s =
           Codegen_schema.create ~reference_base ~reference_root:root schema
         in
-        let param_type = Codegen_schema.to_string s in
+        let param_type = Codegen_schema.to_type s in
         let param_sig, param_impl = create_param name param_type required in
         (param_sig, param_impl) :: params)
       []
@@ -164,7 +160,7 @@ let definition_module ?(path = []) ~root ~reference_base ~name
 
   let alias_type () =
     let param_type =
-      Codegen_schema.kind_to_string
+      Codegen_schema.to_type
         (Codegen_schema.create ~reference_base ~reference_root:root schema)
     in
     let int_or_string =
@@ -176,8 +172,8 @@ let definition_module ?(path = []) ~root ~reference_base ~name
     in
     let create =
       Val.create
-        Val.Sig.(pure "make" [ positional param_type ] "t")
-        Val.Impl.(identity "make" [ positional "t" "t" ])
+        Val.Sig.(pure "make" [ nolabel param_type ] [%type: t])
+        Val.Impl.(identity "make" [ nolabel "t" [%type: t] ])
     in
     ([ typ ], [ create ])
   in
@@ -187,7 +183,7 @@ let definition_module ?(path = []) ~root ~reference_base ~name
     let sig_params, impl_params = params |> List.split in
     let create =
       Val.create
-        (Val.Sig.pure "make" sig_params "t")
+        (Val.Sig.pure "make" sig_params [%type: t])
         (Val.Impl.record_constructor "make" impl_params)
     in
     let fields, values =
@@ -196,14 +192,20 @@ let definition_module ?(path = []) ~root ~reference_base ~name
           let s =
             Codegen_schema.create ~reference_base ~reference_root:root schema
           in
-          let s = Codegen_schema.to_string s in
+          let s = Codegen_schema.to_type s in
           let sig_type, impl_type =
-            if List.mem name required then
-              let type_ = sprintf "%s" s in
-              (type_, type_)
+            if List.mem name required then (s, s)
             else
-              let type_ = sprintf "%s option" s in
-              (type_, sprintf "(%s [@default None])" type_)
+              let intf = Ppxlib.([%type: [%t s] option]) in
+              let name = Ast_builder.Located.mk "default" in
+              let attr =
+                Ast_builder.(
+                  attribute ~name ~payload:(PStr [ pstr_eval [%expr None] [] ]))
+              in
+              let impl =
+                { intf with ptyp_attributes = attr :: intf.ptyp_attributes }
+              in
+              (intf, impl)
           in
           let pname = Param.name name in
           let field =
@@ -212,19 +214,21 @@ let definition_module ?(path = []) ~root ~reference_base ~name
           let field_getter =
             let descr = schema.description in
             Val.create
-              (Val.Sig.pure ?descr pname [ Val.Sig.positional "t" ] sig_type)
-              (Val.Impl.field_getter pname [ Val.Impl.positional "t" "t" ])
+              (Val.Sig.pure ?descr pname
+                 [ Val.Sig.nolabel [%type: t] ]
+                 sig_type)
+              (Val.Impl.field_getter pname [ Val.Impl.nolabel "t" [%type: t] ])
           in
           let field_setter =
             let descr = "Set the value of the " ^ pname ^ " field." in
             Val.create
               (Val.Sig.field_setter ~descr pname
-                 [ Val.Sig.positional sig_type; Val.Sig.positional "t" ]
-                 "t")
+                 [ Val.Sig.nolabel sig_type; Val.Sig.nolabel [%type: t] ]
+                 [%type: t])
               (Val.Impl.field_setter pname
                  [
-                   Val.Impl.positional pname sig_type;
-                   Val.Impl.positional "t" "t";
+                   Val.Impl.nolabel pname sig_type;
+                   Val.Impl.nolabel "t" [%type: t];
                  ])
           in
           (field :: fields, field_setter :: field_getter :: values))
@@ -333,42 +337,55 @@ let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "")
   Mod.add_mod defs root
 
 let object_module =
-  String.trim
-    {|
-module Object = struct
-  module type Value = sig
-    type value
-    val value_of_yojson : Yojson.Safe.t -> value
-    val yojson_of_value : value -> Yojson.Safe.t
-  end
+  let open Ppxlib in
+  [%stri
+    module Object = struct
+      module type Value = sig
+        type value
 
-  module type S = sig
-    type value
-    type t = (string * value) list [@@deriving yojson]
-  end
+        val value_of_yojson : Yojson.Safe.t -> value
+        val yojson_of_value : value -> Yojson.Safe.t
+      end
 
-  module Make (V : Value) : S with type value := V.value = struct
-    type t = (string * V.value) list [@@deriving yojson]
+      module type S = sig
+        type value
+        type t = (string * value) list [@@deriving yojson]
+      end
 
-    let yojson_of_t obj =
-      `Assoc (List.map (fun (k, v) -> (k, V.yojson_of_value v)) obj)
+      module Make (V : Value) : S with type value := V.value = struct
+        type t = (string * V.value) list [@@deriving yojson]
 
-    let t_of_yojson (obj : Yojson.Safe.t) : t =
-      let rec loop acc = function
-        | [] -> List.rev acc
-        | (k, v) :: obj ->
-            let v = V.value_of_yojson v in
-            loop ((k, v) :: acc) obj in
-      match obj with
-      | `Assoc obj -> loop [] obj
-      | _ -> invalid_arg "invalid object"
-  end
+        let yojson_of_t obj =
+          `Assoc (List.map (fun (k, v) -> (k, V.yojson_of_value v)) obj)
 
-  module Of_strings = Make (struct type value = string [@@deriving yojson] end)
-  module Of_floats  = Make (struct type value = float  [@@deriving yojson] end)
-  module Of_ints    = Make (struct type value = int    [@@deriving yojson] end)
-  module Of_bools   = Make (struct type value = bool   [@@deriving yojson] end)
-end
-|}
+        let t_of_yojson (obj : Yojson.Safe.t) : t =
+          let rec loop acc = function
+            | [] -> List.rev acc
+            | (k, v) :: obj ->
+                let v = V.value_of_yojson v in
+                loop ((k, v) :: acc) obj
+          in
+          match obj with
+          | `Assoc obj -> loop [] obj
+          | _ -> invalid_arg "invalid object"
+      end
 
-let to_string m = sprintf "%s\n\n%s" object_module (Mod.to_string m)
+      module Of_strings = Make (struct
+        type value = string [@@deriving yojson]
+      end)
+
+      module Of_floats = Make (struct
+        type value = float [@@deriving yojson]
+      end)
+
+      module Of_ints = Make (struct
+        type value = int [@@deriving yojson]
+      end)
+
+      module Of_bools = Make (struct
+        type value = bool [@@deriving yojson]
+      end)
+    end]
+
+let to_string m =
+  object_module :: Mod.to_mod m |> Ppxlib.Pprintast.string_of_structure
