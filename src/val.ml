@@ -1,3 +1,4 @@
+open Ppxlib
 open Printf
 open Util
 
@@ -6,11 +7,11 @@ module Sig = struct
   type param_data = { name : string; descr : string option }
 
   type param =
-    | Named of param_data * string
-    | Positional of string
-    | Optional of param_data * string
+    | Labelled of param_data * Ast.core_type
+    | Nolabel of Ast.core_type
+    | Optional of param_data * Ast.core_type
 
-  type return = Simple of string | Async of string
+  type return = Simple of Ast.core_type | Async of Ast.core_type
 
   type t = {
     name : string;
@@ -21,11 +22,11 @@ module Sig = struct
   }
 
   let param_descr = function
-    | Positional _
-    | Named ({ descr = None; _ }, _)
+    | Nolabel _
+    | Labelled ({ descr = None; _ }, _)
     | Optional ({ descr = None; _ }, _) ->
         None
-    | Named ({ name; descr = Some descr }, _) ->
+    | Labelled ({ name; descr = Some descr }, _) ->
         Some (sprintf "%s %s" name descr)
     | Optional ({ name; descr = Some descr }, _) ->
         Some (sprintf "%s %s" name descr)
@@ -34,8 +35,8 @@ module Sig = struct
     let descr = descr :: List.map param_descr params |> keep_some in
     { name; params; return; kind; descr }
 
-  let named ?descr name type_ = Named ({ name; descr }, type_)
-  let positional type_ = Positional type_
+  let labelled ?descr name type_ = Labelled ({ name; descr }, type_)
+  let nolabel type_ = Nolabel type_
   let optional ?descr name type_ = Optional ({ name; descr }, type_)
   let pure ?descr name params ret = create ?descr Pure name params (Simple ret)
 
@@ -46,63 +47,66 @@ module Sig = struct
    * OCaml's recursive module safety requirements.
    *
    * See https://stackoverflow.com/q/4239045 *)
-  let constant name = pure name [ Positional "unit" ] "string"
+  let constant name = pure name [ Nolabel [%type: unit] ] [%type: string]
 
   let http_request ?descr name params ret =
     create ?descr Http_request name params (Async ret)
 
-  let param_to_string = function
-    | Named ({ name; _ }, type_) -> sprintf "%s:%s" name type_
-    | Positional type_ -> type_
-    | Optional ({ name; _ }, type_) -> sprintf "?%s:%s" name type_
-
-  let return_to_string = function
-    | Simple t -> t
-    | Async t -> sprintf "(%s, string) result Lwt.t" t
-
-  let params_to_string params =
-    let rec go acc = function
-      | [] -> acc
-      (* extra unit param if last one is optional or named *)
-      | [ ((Optional _ | Named _) as p) ] ->
-          sprintf "%s%s -> unit -> " acc (param_to_string p)
-      | p :: ps -> go (sprintf "%s%s -> " acc (param_to_string p)) ps
+  let make_fun params k =
+    let to_ptyp_arrow k = function
+      | Nolabel t -> Ast_builder.(ptyp_arrow Nolabel t k)
+      | Labelled ({ name; _ }, t) ->
+          Ast_builder.(ptyp_arrow (Labelled name) t k)
+      | Optional ({ name; _ }, t) ->
+          Ast_builder.(ptyp_arrow (Optional name) t k)
     in
-    go "" params
+    let rec aux acc = function
+      | [] -> acc
+      | [ ((Optional _ | Labelled _) as p) ] ->
+          (* Extra unit param if last one is optional or labelled *)
+          to_ptyp_arrow [%type: unit -> [%t k]] p
+      | p :: ps -> to_ptyp_arrow (aux acc ps) p
+    in
+    aux k params
 
-  let to_string ?(indent = 0) { name; params; return; kind; descr } =
-    let pad = String.make indent ' ' in
+  let to_sig { name; params; return; kind; descr } =
     let params =
       match kind with
       | Pure -> params
       | Http_request ->
-          let ctx = optional "ctx" "Cohttp_lwt_unix.Client.ctx" in
-          let headers = optional "headers" "Cohttp.Header.t" in
-          let uri = positional "Uri.t" in
+          let ctx = optional "ctx" [%type: Cohttp_lwt_unix.Client.ctx] in
+          let headers = optional "headers" [%type: Cohttp.Header.t] in
+          let uri = nolabel [%type: Uri.t] in
           params @ [ ctx; headers; uri ]
     in
     let doc =
       match descr with
-      | [] -> ""
-      | _ ->
-          let comment_pad = pad ^ String.make 3 ' ' in
+      | [] -> None
+      | descr :: params ->
           let descr =
-            List.mapi
-              (fun i d ->
-                let d = format_comment d in
-                if i = 0 then sprintf "%s(** %s" pad d
-                else sprintf "\n%s @param %s" comment_pad d)
-              descr
+            descr
+            :: List.map (fun d -> sprintf "@param %s" (format_comment d)) params
           in
-          String.concat "\n" descr ^ " *)\n"
+          Some (Util.ocaml_doc (String.concat "\n" descr))
     in
-    sprintf "%s%sval %s : %s%s\n" doc pad name (params_to_string params)
-      (return_to_string return)
+    let open Ast_builder in
+    let name = Located.mk name in
+    let return =
+      match return with
+      | Simple t -> t
+      | Async t -> [%type: ([%t t], string) result Lwt.t]
+    in
+    let type_ = make_fun params return in
+    let value_description =
+      Ast_builder.value_description ~name ~type_ ~prim:[]
+    in
+    let pval_attributes = Util.opt_cons doc value_description.pval_attributes in
+    { value_description with pval_attributes }
 end
 
 module Impl = struct
   type http_verb = Get | Put | Post | Delete | Head | Patch | Options
-  type return = Module of string | Type of string
+  type return = Module of string | Type of Ast.core_type
 
   type kind =
     | Record_constructor
@@ -113,11 +117,11 @@ module Impl = struct
     | Http_request of http_verb * return
 
   type origin = { location : Swagger_t.location; orig_name : string }
-  type param_data = { name : string; type_ : string }
+  type param_data = { name : string; type_ : Ast.core_type }
 
   type param =
-    | Named of param_data * origin option
-    | Positional of param_data
+    | Labelled of param_data * origin option
+    | Nolabel of param_data
     | Optional of param_data * origin option
 
   let module_ name = Module name
@@ -126,8 +130,8 @@ module Impl = struct
   let origin (p : Swagger_t.parameter) =
     { location = p.location; orig_name = p.name }
 
-  let named ?origin name type_ = Named ({ name; type_ }, origin)
-  let positional name type_ = Positional { name; type_ }
+  let labelled ?origin name type_ = Labelled ({ name; type_ }, origin)
+  let nolabel name type_ = Nolabel { name; type_ }
   let optional ?origin name type_ = Optional ({ name; type_ }, origin)
 
   type t = { name : string; params : param list; kind : kind }
@@ -139,22 +143,22 @@ module Impl = struct
   let identity = create Identity
 
   let constant name value =
-    create (Constant value) name [ positional "()" "unit" ]
+    create (Constant value) name [ nolabel "()" [%type: unit] ]
 
   let http_request ~return verb = create (Http_request (verb, return))
 
   let param_name = function
-    | Named (p, _) | Positional p | Optional (p, _) -> p.name
+    | Labelled (p, _) | Nolabel p | Optional (p, _) -> p.name
 
   let param_type = function
-    | Named (p, _) | Positional p | Optional (p, _) -> p.type_
+    | Labelled (p, _) | Nolabel p | Optional (p, _) -> p.type_
 
   let param_location = function
-    | Named (_, Some origin) -> Some origin.location
-    | Named (_, None) -> None
+    | Labelled (_, Some origin) -> Some origin.location
+    | Labelled (_, None) -> None
     | Optional (_, Some origin) -> Some origin.location
     | Optional (_, None) -> None
-    | Positional _ -> None
+    | Nolabel _ -> None
 
   let http_verb_of_string = function
     | "get" -> Get
@@ -166,72 +170,96 @@ module Impl = struct
     | "options" -> Options
     | op -> failwith ("unknown HTTP verb: " ^ op)
 
-  let record_constructor_body ~pad params =
-    let param_names = List.map param_name params in
-    sprintf "%s{ %s }" pad (String.concat "; " param_names)
-
-  let assoc_string_with f params =
-    params |> List.map f |> String.concat "; " |> sprintf "[%s]"
-
-  let assoc_opt_string =
-    let string_of = sprintf "string_of_%s %s" in
-    let string_opt_to_string =
-      sprintf {| match %s with Some s -> s | None -> "" |}
+  let record_constructor_body params =
+    let fields =
+      List.fold_left
+        (fun acc param ->
+          let ident = Ast_builder.Located.lident (param_name param) in
+          let exp = Ast_builder.pexp_ident ident in
+          (ident, exp) :: acc)
+        [] params
     in
-    let opt_to_string =
-      sprintf {| match %s with Some x -> string_of_%s x | None -> "" |}
+    Ast_builder.pexp_record (List.rev fields) None
+
+  (* FIXME: take into account collectionFormat *)
+
+  let assoc_string_with f params = Ast_builder.elist (List.map f params)
+
+  let assoc_opt_string params =
+    let string_of name =
+      let name = Ast_builder.evar name in
+      let conv = function
+        | [%type: string] -> name
+        | { Ast.ptyp_desc = Ptyp_constr (lident, []); _ } ->
+            let conv lident =
+              Longident.parse ("string_of_" ^ Longident.name lident)
+            in
+            let lident = Ast_builder.Located.map conv lident in
+            let e = Ast_builder.(pexp_ident lident) in
+            [%expr [%e e] [%e name]]
+        | _ -> assert false
+      in
+      function
+      | [%type: [%t? t] array] ->
+          let conv = conv t in
+          [%expr String.concat "," (Array.to_list [%e conv])]
+      | t -> conv t
     in
-    assoc_string_with (fun p ->
+    let string_opt_to_string name =
+      let name = Ast_builder.(pexp_ident (Located.lident name)) in
+      [%expr match [%e name] with Some s -> s | None -> ""]
+    in
+    let opt_to_string name = function
+      | { Ast.ptyp_desc = Ptyp_constr (lident, []); _ } ->
+          let name = Ast_builder.(pexp_ident (Located.lident name)) in
+          let conv =
+            Ast_builder.type_constr_conv lident ~f:(sprintf "string_of_%s")
+              [ [%expr x] ]
+          in
+          [%expr match [%e name] with Some x -> [%e conv] | None -> ""]
+      | _ -> assert false
+    in
+    assoc_string_with
+      (fun p ->
         let orig_name, value =
           match p with
-          | Named ({ name; type_ = "string" }, Some origin) ->
-              (origin.orig_name, name)
-          | Named ({ name; type_ }, Some origin) ->
-              (origin.orig_name, string_of type_ name)
-          | Named ({ name; type_ = "string" }, None) -> (name, name)
-          | Named ({ name; type_ }, None) -> (name, string_of type_ name)
-          | Optional ({ name; type_ = "string" }, Some origin) ->
+          | Labelled ({ name; type_ = [%type: string] }, Some origin) ->
+              (origin.orig_name, Ast_builder.evar name)
+          | Labelled ({ name; type_ }, Some origin) ->
+              (origin.orig_name, string_of name type_)
+          | Labelled ({ name; type_ = [%type: string] }, None) ->
+              (name, Ast_builder.evar name)
+          | Labelled ({ name; type_ }, None) -> (name, string_of name type_)
+          | Optional ({ name; type_ = [%type: string] }, Some origin) ->
               (origin.orig_name, string_opt_to_string name)
           | Optional ({ name; type_ }, Some origin) ->
               (origin.orig_name, opt_to_string name type_)
           | Optional ({ name; type_ }, None) -> (name, opt_to_string name type_)
-          | Positional _ ->
-              failwith "positional parameters don't go in requests"
+          | Nolabel _ -> failwith "positional parameters don't go in requests"
         in
-        sprintf "(\"%s\", %s)" orig_name value)
+        let orig_name = Ast_builder.estring orig_name in
+        [%expr [%e orig_name], [%e value]])
+      params
 
   let assoc_string =
     assoc_string_with (fun p ->
+        let open Ast_builder in
         let name = param_name p in
-        let type_ = param_type p in
         let value =
-          if type_ = "string" then name
-          else sprintf "string_of_%s %s" type_ name
+          let name = evar name in
+          match param_type p with
+          | [%type: string] -> name
+          | { Ast.ptyp_desc = Ptyp_constr (lident, []); _ } ->
+              type_constr_conv lident ~f:(sprintf "string_of_%s") [ name ]
+          | _ -> assert false
         in
-        sprintf "(\"%s\", %s)" name value)
+        let name = estring name in
+        [%expr [%e name], [%e value]])
 
   let make_query params =
     params
     |> List.filter (fun p -> param_location p = Some `Query)
     |> assoc_opt_string
-
-  let is_space = function
-    | ' ' | '\012' | '\n' | '\r' | '\t' -> true
-    | _ -> false
-
-  let trim_at_most n s =
-    let n = min n (String.length s) in
-    let rec go k s =
-      if s = "" then s
-      else if k < n then
-        let last = String.length s - 1 in
-        if is_space s.[0] then
-          let len = max 0 (last - if is_space s.[last] then 1 else 0) in
-          go (k + 1) (String.sub s 1 len)
-        else s
-      else s
-    in
-    go 0 s
 
   let make_path params =
     let path_params =
@@ -239,48 +267,58 @@ module Impl = struct
       |> List.filter (fun p -> param_location p = Some `Path)
       |> assoc_string
     in
-    String.trim
-    @@ sprintf
-         {|
-          let open Printf in
-          let path_params = %s in
-          List.fold_left
-            (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%%s\\}" name) in
-              Re.replace_string re ~by:value path)
-            (request_path_template ())
-            path_params
-    |}
-         path_params
+    [%expr
+      let open Printf in
+      let path_params = [%e path_params] in
+      List.fold_left
+        (fun path (name, value) ->
+          let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+          Re.replace_string re ~by:value path)
+        (request_path_template ()) path_params]
 
   let make_headers params =
     params |> List.filter (fun p -> param_location p = Some `Header) |> function
-    | [] -> "headers"
+    | [] -> Ast_builder.evar "headers"
     | hs ->
-        sprintf
-          {|
-             let headers =
-               match headers with
-               | Some hs -> hs
-               | None -> Header.init () in
-             Some (Header.add_list headers %s)
-           |}
-          (assoc_string hs)
+        let headers = assoc_string hs in
+        [%expr
+          let headers =
+            match headers with Some hs -> hs | None -> Header.init ()
+          in
+          Some (Header.add_list headers [%e headers])]
 
   let make_body params =
     let body_params =
       params |> List.filter (fun p -> param_location p = Some `Body)
     in
     match body_params with
-    | [] -> "None"
+    | [] -> [%expr None]
     | [ p ] ->
-        let yojson_of_t =
-          param_type p |> String.split_on_char '.' |> unsnoc |> Option.get
-          |> fst |> String.concat "." |> sprintf "%s.yojson_of_t"
+        let lident path ident =
+          let last = Longident.last_exn path in
+          let name = Longident.name path in
+          String.(sub name 0 (length name - length last) ^ ident)
         in
-        String.trim
-        @@ sprintf {| Some (Body.of_string (Yojson.Safe.to_string (%s %s))) |}
-             yojson_of_t (param_name p)
+        let name = Ast_builder.evar (param_name p) in
+        let conv =
+          let convs = function
+            | { Ast.ptyp_desc = Ptyp_constr ({ txt; _ }, []); _ } ->
+                ( Ast_builder.(
+                    pexp_ident (Located.lident (lident txt "yojson_of_t"))),
+                  Ast_builder.(
+                    pexp_ident (Located.lident (lident txt "t_of_yojson"))) )
+            | _ -> assert false
+          in
+          match param_type p with
+          | [%type: [%t? t] list] ->
+              let yojson_of_t, _ = convs t in
+              [%expr `List (List.map [%e yojson_of_t] [%e name])]
+          | { Ast.ptyp_desc = Ptyp_constr _; _ } as t ->
+              let yojson_of_t, _t_of_yojson = convs t in
+              [%expr [%e yojson_of_t] [%e name]]
+          | _ -> assert false
+        in
+        [%expr Some (Body.of_string (Yojson.Safe.to_string [%e conv]))]
     | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
 
   let string_of_http_verb = function
@@ -293,71 +331,98 @@ module Impl = struct
     | Options -> "options"
 
   let client_function_of_http_verb = function
-    | Options -> "call `OPTIONS"
-    | verb -> string_of_http_verb verb
+    | Options -> [%expr Client.call `OPTIONS]
+    | verb -> Ast_builder.evar ("Client." ^ string_of_http_verb verb)
 
-  let continuation_of_http_verb = function
+  let continuation_of_http_verb k = function
     | Head ->
-        "fun resp ->let code = resp |> Response.status |> Code.code_of_status in\n\
-         let body = \"Ok\" in"
+        [%expr
+          fun resp ->
+            let code = resp |> Response.status |> Code.code_of_status in
+            let body = "Ok" in
+            [%e k]]
     | _ ->
-        "fun (resp, body) ->\n\
-         let code = resp |> Response.status |> Code.code_of_status in\n\
-         Body.to_string body >>= fun body ->"
+        [%expr
+          fun (resp, body) ->
+            let code = resp |> Response.status |> Code.code_of_status in
+            Body.to_string body >>= fun body -> [%e k]]
 
-  let build_http_request ~pad ?(body_param = false) ~return verb params =
-    let client_fun = client_function_of_http_verb verb in
-    let result_cont = continuation_of_http_verb verb in
-    let body_param =
-      if body_param then sprintf " ?body:(%s)" (make_body params) else ""
+  let make_response_code ?(body_param = false) ~return verb params =
+    let params =
+      let open Ast in
+      (Optional "ctx", [%expr ctx])
+      :: (Optional "headers", [%expr headers])
+      :: (if body_param then List.cons (Optional "body", make_body params)
+         else Fun.id)
+           [ (Nolabel, [%expr uri]) ]
     in
-    let response_code =
+    let client_fun =
+      Ast_builder.pexp_apply (client_function_of_http_verb verb) params
+    in
+    let return =
+      (* FIXME: handle the response schema. *)
       match return with
       | Module module_name ->
-          sprintf
-            {|
-        Client.%s ?ctx ?headers%s uri >>= %s
-        let json = Yojson.Safe.from_string body in
-        Lwt.return (if code >= 200 && code < 300 then %s.t_of_yojson json else Error body)
-      |}
-            client_fun body_param result_cont module_name
-      | Type type_name ->
-          let conv_result = function
-            | "unit" -> "()"
-            | "string" -> "body"
-            | other -> sprintf "(%s_of_string body)" other
+          let t_of_yojson =
+            Ast_builder.(
+              pexp_ident (Located.lident (module_name ^ ".t_of_yojson")))
           in
-          sprintf
-            {|
-        Client.%s ?ctx ?headers%s uri >>= %s
-        ignore body;
-        Lwt.return (if code >= 200 && code < 300 then Ok %s else Error (string_of_int code))
-      |}
-            client_fun body_param result_cont (conv_result type_name)
+          [%expr
+            let json = Yojson.Safe.from_string body in
+            Lwt.return
+              (if code >= 200 && code < 300 then Ok ([%e t_of_yojson] json)
+              else Error body)]
+      | Type type_name ->
+          let conv_result =
+            let conv str = function
+              | { Ast.ptyp_desc = Ptyp_constr (lident, _); _ } ->
+                  let conv lident =
+                    Longident.parse (str (Longident.name lident))
+                  in
+                  let lident = Ast_builder.Located.map conv lident in
+                  Ast_builder.(pexp_ident lident)
+              | _ -> assert false
+            in
+            match type_name with
+            | [%type: unit] -> [%expr ()]
+            | [%type: string] -> [%expr body]
+            | [%type: [%t? t] list] ->
+                let conv = conv (sprintf "%s_of_yojson") t in
+                [%expr
+                  Yojson.Safe.(Util.convert_each [%e conv] (from_string body))]
+            | { Ast.ptyp_desc = Ptyp_constr _; _ } as t ->
+                let conv = conv (sprintf "%s_of_yojson") t in
+                [%expr [%e conv] (Yojson.Safe.from_string body)]
+            | _ -> assert false
+          in
+          [%expr
+            ignore body;
+            Lwt.return
+              (if code >= 200 && code < 300 then Ok [%e conv_result]
+              else Error (string_of_int code))]
     in
-    let code =
-      String.trim
-      @@ sprintf
-           {|
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
-        let query = %s in
-        let path =
-          %s in
-        let full_path = (Uri.path uri) ^ path in
-        let uri = Uri.with_path uri full_path in
-        let uri = Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query) in
-        let headers = %s in
-        %s
-      |}
-           (make_query params) (make_path params) (make_headers params)
-           (String.trim response_code)
-    in
-    code |> String.split_on_char '\n'
-    |> List.map (fun l -> sprintf "%s%s" pad (trim_at_most 10 l))
-    |> String.concat "\n"
+    let result = continuation_of_http_verb return verb in
+    [%expr [%e client_fun] >>= [%e result]]
+
+  let build_http_request ?body_param ~return verb params =
+    let query = make_query params
+    and path = make_path params
+    and headers = make_headers params
+    and response_code = make_response_code ?body_param ~return verb params in
+    [%expr
+      let open Lwt.Infix in
+      let open Cohttp in
+      let open Cohttp_lwt_unix in
+      let module Body = Cohttp_lwt.Body in
+      let query = [%e query] in
+      let path = [%e path] in
+      let full_path = Uri.path uri ^ path in
+      let uri = Uri.with_path uri full_path in
+      let uri =
+        Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
+      in
+      let headers = [%e headers] in
+      [%e response_code]]
 
   let http_get ~return = build_http_request ~return Get
   let http_put ~return = build_http_request ~body_param:true ~return Put
@@ -367,51 +432,55 @@ module Impl = struct
   let http_patch ~return = build_http_request ~body_param:true ~return Patch
   let http_options ~return = build_http_request ~return Options
 
-  let body_to_string ?(indent = 0) t =
-    let pad = String.make indent ' ' in
+  let body t =
     match t.kind with
-    | Record_constructor -> record_constructor_body ~pad t.params
-    | Field_getter -> sprintf "%st.%s" pad t.name
-    | Field_setter -> sprintf "%s{ t with %s }" pad t.name
-    | Identity -> sprintf "%st" pad
-    | Constant v -> sprintf "%s\"%s\"" pad v
-    | Http_request (Get, return) -> http_get ~pad ~return t.params
-    | Http_request (Put, return) -> http_put ~pad ~return t.params
-    | Http_request (Post, return) -> http_post ~pad ~return t.params
-    | Http_request (Delete, return) -> http_delete ~pad ~return t.params
-    | Http_request (Head, return) -> http_head ~pad ~return t.params
-    | Http_request (Patch, return) -> http_patch ~pad ~return t.params
-    | Http_request (Options, return) -> http_options ~pad ~return t.params
+    | Record_constructor -> record_constructor_body t.params
+    | Field_getter -> Ast_builder.evar ("t." ^ t.name)
+    | Field_setter ->
+        let ident = Ast_builder.Located.lident t.name in
+        let exp = Ast_builder.pexp_ident ident in
+        Ast_builder.pexp_record [ (ident, exp) ] (Some [%expr t])
+    | Identity -> [%expr t]
+    | Constant v -> Ast_builder.estring v
+    | Http_request (Get, return) -> http_get ~return t.params
+    | Http_request (Put, return) -> http_put ~return t.params
+    | Http_request (Post, return) -> http_post ~return t.params
+    | Http_request (Delete, return) -> http_delete ~return t.params
+    | Http_request (Head, return) -> http_head ~return t.params
+    | Http_request (Patch, return) -> http_patch ~return t.params
+    | Http_request (Options, return) -> http_options ~return t.params
 
-  let param_to_string = function
-    | Named (p, _) -> sprintf "~%s" p.name
-    | Positional p -> p.name
-    | Optional (p, _) -> sprintf "?%s" p.name
-
-  let params_to_string params =
-    let rec go acc = function
-      | [] -> acc
-      (* extra () param if last one is optional or named *)
-      | [ ((Optional _ | Named _) as p) ] ->
-          sprintf "%s%s () " acc (param_to_string p)
-      | p :: ps -> go (sprintf "%s%s " acc (param_to_string p)) ps
+  let make_fun params k =
+    let to_pexp_fun k = function
+      | Labelled (p, _) ->
+          Ast_builder.(pexp_fun (Labelled p.name) None (pvar p.name) k)
+      | Nolabel p -> Ast_builder.(pexp_fun Nolabel None (pvar p.name) k)
+      | Optional (p, _) ->
+          Ast_builder.(pexp_fun (Optional p.name) None (pvar p.name) k)
     in
-    go "" params
+    let rec aux acc = function
+      | [] -> acc
+      | [ ((Optional _ | Labelled _) as p) ] ->
+          (* extra () param if last one is optional or labelled *)
+          to_pexp_fun [%expr fun () -> [%e k]] p
+      | p :: ps -> to_pexp_fun (aux acc ps) p
+    in
+    aux k params
 
-  let to_string ?(indent = 0) ({ kind; name; params } as value) =
-    let pad = String.make indent ' ' in
+  let to_impl ({ kind; name; params } as value) =
     let params =
       match kind with
       | Http_request _ ->
-          let ctx = optional "ctx" "Cohttp_lwt_unix.Client.ctx" in
-          let headers = optional "headers" "Cohttp.Header.t" in
-          let uri = positional "uri" "Uri.t" in
+          let ctx = optional "ctx" [%type: Cohttp_lwt_unix.Client.ctx] in
+          let headers = optional "headers" [%type: Cohttp.Header.t] in
+          let uri = nolabel "uri" [%type: Uri.t] in
           params @ [ ctx; headers; uri ]
       | _ -> params
     in
     let name = match kind with Field_setter -> "set_" ^ name | _ -> name in
-    sprintf "%slet %s %s=\n%s\n" pad name (params_to_string params)
-      (body_to_string ~indent:(indent + 2) value)
+    let name = Ast_builder.pvar name in
+    let e = make_fun params (body value) in
+    [%stri let [%p name] = [%e e]]
 end
 
 type t = { signature : Sig.t; implementation : Impl.t }

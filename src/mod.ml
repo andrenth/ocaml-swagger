@@ -1,4 +1,5 @@
 open Printf
+open Ppxlib
 open Util
 
 type t = {
@@ -55,72 +56,78 @@ let qualified_name m =
 
 let qualified_path m = m.path @ [ m.name ]
 let has_type_named n m = List.exists (fun t -> Type.name t = n) m.types
+let object_module_intf = [%sigi: module Object : Object.S with type value := t]
 
-let object_module_val ?(indent = 0) () =
-  let pad = String.make indent ' ' in
-  "\n" ^ pad ^ "module Object : Object.S with type value := t\n"
+let object_module_impl =
+  [%stri
+    module Object = Object.Make (struct
+      type value = t [@@deriving yojson]
+    end)]
 
-let object_module_impl ?(indent = 0) () =
-  let pad = String.make indent ' ' in
-  "\n" ^ pad
-  ^ "module Object = Object.Make (struct type value = t [@@deriving yojson] end)\n"
-
-let rec sig_to_string ?(indent = 0) m =
-  let pad = String.make indent ' ' in
-  let doc =
-    match m.descr with
-    | Some d -> pad ^ sprintf "(** %s *)\n" (format_comment d)
-    | None -> ""
+let rec to_module_type m =
+  let open Ast_builder in
+  let definitions, submods =
+    Util.fold_left_map'
+      (fun defs submods (name, m) ->
+        let type_ = to_module_type m in
+        let decl = module_declaration ~name:(Located.mk (Some m.name)) ~type_ in
+        let s = psig_module decl in
+        (* Definitions first to simplify references *)
+        if name = "Definitions" then (Some s, submods) else (defs, s :: submods))
+      (m.submodules |> StringMap.bindings)
   in
+  let types =
+    List.rev_map
+      (fun t ->
+        Ast_builder.psig_type Recursive [ Type.Sig.to_sig (Type.signature t) ])
+      m.types
+  in
+  let values =
+    List.rev_map
+      (fun v -> Ast_builder.psig_value (Val.Sig.to_sig (Val.signature v)))
+      m.values
+  in
+  let items =
+    (if has_type_named "t" m then [ object_module_intf ] else [])
+    |> List.rev_append values |> List.append types |> List.rev_append submods
+    |> Util.opt_cons definitions
+  in
+  let t = pmty_signature items in
+  match m.descr with
+  | None -> t
+  | Some descr ->
+      let pmty_attributes = Util.ocaml_doc descr :: t.pmty_attributes in
+      { t with pmty_attributes }
+
+let rec to_mod_structure m =
   let submods =
     m.submodules |> StringMap.bindings
-    |> List.fold_left
-         (fun acc (name, m) ->
-           let s = sig_to_string ~indent:(indent + 2) m in
-           (* Definitions first to simplify references *)
-           if name = "Definitions" then s ^ acc else acc ^ s)
-         ""
+    |> List.rev_map (fun (name, m) ->
+           let name = Ast_builder.Located.mk (Some name) in
+           Ast_builder.(
+             pstr_module (module_binding ~name ~expr:(to_mod_structure m))))
   in
-  let indent = indent + 2 in
-  sprintf "\n%s%smodule%s%s : sig\n%s%s\n%s%s%send\n" doc pad
-    (if m.recursive then " rec " else " ")
-    m.name submods
-    (String.concat "\n\n"
-       (List.map
-          (fun t -> Type.Sig.to_string ~indent (Type.signature t))
-          m.types))
-    (String.concat "\n"
-       (List.map
-          (fun v -> Val.Sig.to_string ~indent (Val.signature v))
-          m.values))
-    (if has_type_named "t" m then object_module_val ~indent () else "")
-    pad
-
-let rec impl_to_string ?(indent = 0) m =
-  let pad = String.make indent ' ' in
-  let submods =
-    m.submodules |> StringMap.bindings
-    |> List.fold_left
-         (fun acc (_name, m) -> acc ^ impl_to_string ~indent:(indent + 2) m)
-         ""
+  let types =
+    List.concat_map (fun t -> Type.Impl.to_impl (Type.implementation t)) m.types
   in
-  let decl = if m.recursive then "" else sprintf "%smodule %s " pad m.name in
+  let values =
+    List.rev_map (fun v -> Val.Impl.to_impl (Val.implementation v)) m.values
+  in
+  let items =
+    (if has_type_named "t" m then [ object_module_impl ] else [])
+    |> List.rev_append values |> List.append types |> List.rev_append submods
+  in
+  Ast_builder.pmod_structure items
 
-  let indent = indent + 2 in
-  sprintf "%s= struct\n%s%s\n%s%s%send\n" decl submods
-    (String.concat "\n\n"
-       (List.map
-          (fun t -> Type.Impl.to_string ~indent (Type.implementation t))
-          m.types))
-    (String.concat "\n"
-       (List.map
-          (fun v -> Val.Impl.to_string ~indent (Val.implementation v))
-          m.values))
-    (if has_type_named "t" m then object_module_impl ~indent () else "")
-    pad
-
-let to_string ?indent m =
-  sprintf "%s %s" (sig_to_string ?indent m) (impl_to_string ?indent m)
+let to_mod m =
+  let open Ast_builder in
+  let name = Located.mk (Some m.name) in
+  let module_type = to_module_type m in
+  let mod_structure = to_mod_structure m in
+  let binding =
+    module_binding ~name ~expr:(pmod_constraint mod_structure module_type)
+  in
+  [ (if m.recursive then pstr_recmodule [ binding ] else pstr_module binding) ]
 
 let strip_base base path =
   let plen = String.length path in

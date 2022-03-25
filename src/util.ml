@@ -35,6 +35,19 @@ let format_comment =
     |> Re.replace re ~f:(fun g -> "\\" ^ Re.Group.get g 0)
     |> String.split_on_char ' ' |> List.map snake_case |> String.concat " "
 
+let loc = Ppxlib.Location.none
+
+module Ast_builder = Ppxlib.Ast_builder.Make (struct
+  let loc = loc
+end)
+
+let ocaml_doc descr =
+  let open Ast_builder in
+  let name = Located.mk "ocaml.doc" in
+  let doc = pexp_constant (Pconst_string (descr, loc, Some "ocamlswagger")) in
+  let doc = pstr_eval [%expr [%e doc]] [] in
+  attribute ~name ~payload:(PStr [ doc ])
+
 let unsnoc l =
   let rec go acc = function
     | [] -> None
@@ -44,8 +57,24 @@ let unsnoc l =
   go [] l
 
 let keep_some l = List.filter_map Fun.id l
+let opt_cons o l = match o with Some o -> o :: l | None -> l
+
+let fold_left_map' f l =
+  let rec aux x acc = function
+    | [] -> (x, acc)
+    | hd :: tl ->
+        let x, acc = f x acc hd in
+        aux x acc tl
+  in
+  aux None [] l
 
 module StringMap = Map.Make (struct
+  type t = string
+
+  let compare = compare
+end)
+
+module StringSet = Set.Make (struct
   type t = string
 
   let compare = compare

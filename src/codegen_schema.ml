@@ -1,4 +1,5 @@
 open Printf
+open Util
 
 type t = {
   raw : Swagger_t.schema;
@@ -11,48 +12,46 @@ let create ~reference_base ~reference_root raw =
 
 let reference t = t.raw.ref
 
-let rec kind_to_string t =
+let rec to_type t =
   let reference_base = t.reference_base in
   let reference_root = t.reference_root in
   match t.raw.ref with
-  | Some r -> Mod.reference_type ~reference_base ~reference_root r
+  | Some r ->
+      let t = Mod.reference_type ~reference_base ~reference_root r in
+      Ast_builder.(ptyp_constr (Located.lident t) [])
   | None -> (
       match Option.get t.raw.kind with
-      | `String -> "string"
-      | `Number -> "float"
-      | `Integer -> "int"
-      | `Boolean -> "bool"
+      | `String -> [%type: string]
+      | `Number -> [%type: float]
+      | `Integer -> [%type: int]
+      | `Boolean -> [%type: bool]
       | `Object -> (
           let open Swagger_t in
           match t.raw.additional_properties with
           | Some props -> (
               match (props.ref, props.kind) with
               | Some r, _ ->
-                  sprintf "%s.Object.t"
-                    (Mod.reference_module ~reference_base ~reference_root r)
-              | None, Some `String -> "Object.Of_strings.t"
-              | None, Some `Number -> "Object.Of_floats.t"
-              | None, Some `Integer -> "Object.Of_ints.t"
-              | None, Some `Boolean -> "Object.Of_bools.t"
+                  let t =
+                    Mod.reference_module ~reference_base ~reference_root r
+                  in
+                  Ast_builder.(
+                    ptyp_constr (Located.lident (sprintf "%s.Object.t" t)) [])
+              | None, Some `String -> [%type: Object.Of_strings.t]
+              | None, Some `Number -> [%type: Object.Of_floats.t]
+              | None, Some `Integer -> [%type: Object.Of_ints.t]
+              | None, Some `Boolean -> [%type: Object.Of_bools.t]
               | None, _ ->
-                  sprintf "(string * %s) list"
-                    (kind_to_string
-                       (create ~reference_base ~reference_root props)))
-          | None -> "unit")
+                  let t =
+                    to_type (create ~reference_base ~reference_root props)
+                  in
+                  [%type: (string * [%t t]) list])
+          | None -> [%type: unit])
       | `Array -> (
           let open Swagger_t in
           match t.raw.items with
           | Some s ->
-              let s = create ~reference_base ~reference_root s in
-              kind_to_string s ^ " list"
+              let t = to_type (create ~reference_base ~reference_root s) in
+              [%type: [%t t] list]
           | None ->
               failwith
-                ("Schema.kind_to_string: array type must have an "
-               ^ "'items' field")))
-
-let to_string t =
-  let reference_base = t.reference_base in
-  let reference_root = t.reference_root in
-  match t.raw.ref with
-  | Some r -> Mod.reference_type ~reference_base ~reference_root r
-  | None -> kind_to_string t
+                "Schema.kind_to_string: array type must have an 'items' field"))

@@ -33,4 +33,4 @@ val reference_type :
 
 val split_ref : string -> string list
 val strip_base : string -> string -> string
-val to_string : ?indent:int -> t -> string
+val to_mod : t -> Ppxlib.Ast.structure

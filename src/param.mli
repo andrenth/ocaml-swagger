@@ -8,4 +8,3 @@ val create :
   Val.Sig.param * Val.Impl.param
 
 val name : string -> string
-val kind_to_string : t -> string

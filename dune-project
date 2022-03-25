@@ -18,6 +18,7 @@
   (atdgen (>= 2.10))
   (re (>= 1.10.3))
   (yojson (>= 2.0))
+  (ppxlib (>= 0.25.0))
   (ppx_yojson_conv (and (>= v0.15) :with-test))
   (cohttp-lwt-unix (and (>= 5.0.0) :with-test))
   (uri (and (>= 4.2) :with-test))
