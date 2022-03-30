@@ -13,7 +13,7 @@ bug-reports: "https://github.com/andrenth/ocaml-swagger/issues"
 depends: [
   "dune" {>= "3.4"}
   "ocaml" {>= "4.14"}
-  "atdgen" {>= "2.2.1"}
+  "atdgen" {>= "2.10"}
   "re" {>= "1.10.3"}
   "yojson" {>= "1.7.0"}
   "odoc" {with-doc}

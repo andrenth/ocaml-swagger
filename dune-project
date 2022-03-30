@@ -15,6 +15,6 @@
  (description "Swagger 2.0 code generator for OCaml")
  (depends
   (ocaml (>= 4.14))
-  (atdgen (>= 2.2.1))
+  (atdgen (>= 2.10))
   (re (>= 1.10.3))
   (yojson (>= 1.7.0))))
