@@ -2,13 +2,13 @@ type t <ocaml module="Yojson.Safe"> = abstract
 
 type contact =
   { ?name : string option
-  ; ?url <ocaml valid="Swagger_util.Validate.url"> : string option
-  ; ?email <ocaml valid="Swagger_util.Validate.email"> : string option
+  ; ?url : string <ocaml valid="Swagger_util.Validate.url"> option
+  ; ?email : string <ocaml valid="Swagger_util.Validate.email"> option
   }
 
 type license =
   { name : string
-  ; ?url <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?url : string <ocaml valid="Swagger_util.Validate.url"> option
   }
 
 type info =
@@ -54,7 +54,7 @@ type collection_format =
 
 type xml =
   { ?name : string option
-  ; ?namespace <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?namespace : string <ocaml valid="Swagger_util.Validate.url"> option
   ; ?prefix : string option
   ; ~attribute <ocaml default="false"> : bool
   ; ~wrapped <ocaml default="false"> : bool
@@ -90,7 +90,7 @@ type items =
 
 type external_documentation =
   { ?description : string option
-  ; url <ocaml valid="Swagger_util.Validate.url"> : string
+  ; url : string <ocaml valid="Swagger_util.Validate.url">
   }
 
 type schema_kind =
@@ -197,13 +197,13 @@ type response =
 
 type responses_definitions = (string * response) list <json repr="object">
 
-type reference <ocaml valid="Swagger_util.Validate.url"> = string
+type reference = string <ocaml valid="Swagger_util.Validate.url">
 
 type responses = (string * t) list <json repr="object">
 
 type operation =
   { ?tags : string list option
-  ; ?summary <ocaml valid="Swagger_util.Validate.length ~max:120"> : string option
+  ; ?summary : string option <ocaml valid="Swagger_util.Validate.length ~max:120">
   ; ?description : string option
   ; ?external_docs <json name="externalDocs"> : external_documentation option
   ; ?operation_id <json name="operationId"> : string option
@@ -259,8 +259,8 @@ type security_scheme =
   ; name : string
   ; location <json name="in"> : security_scheme_location
   ; ?flow : security_scheme_flow option
-  ; ?authorization_url <json name="authorizationUrl"> <ocaml valid="Swagger_util.Validate.url"> : string option
-  ; ?token_url <json name="tokenUrl"> <ocaml valid="Swagger_util.Validate.url"> : string option
+  ; ?authorization_url <json name="authorizationUrl"> : string <ocaml valid="Swagger_util.Validate.url"> option
+  ; ?token_url <json name="tokenUrl"> : string <ocaml valid="Swagger_util.Validate.url"> option
   ; ?scopes : scopes option
   }
 
@@ -277,10 +277,10 @@ type tag =
 type definitions = (string * schema) list <json repr="object">
 
 type swagger =
-  { swagger <ocaml valid="Swagger_util.Validate.version"> : string
+  { swagger : string <ocaml valid="Swagger_util.Validate.version">
   ; info : info
-  ; ?host <ocaml valid="Swagger_util.Validate.host"> : string option
-  ; ?base_path <json name="basePath"> <ocaml valid="Swagger_util.Validate.base_path"> : string option
+  ; ?host : string <ocaml valid="Swagger_util.Validate.host"> option
+  ; ?base_path <json name="basePath"> : string <ocaml valid="Swagger_util.Validate.base_path"> option
   ; ?schemes : scheme list option
   ; ?consumes : string list option (* validate mime? *)
   ; ?produces : string list option (* validate mime? *)
