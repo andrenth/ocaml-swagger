@@ -17,4 +17,7 @@
   (ocaml (>= 4.14))
   (atdgen (>= 2.10))
   (re (>= 1.10.3))
-  (yojson (>= 1.7.0))))
+  (yojson (>= 1.7.0))
+  (ppx_deriving_yojson (and (>= 3.6.1) :with-test))
+  (cohttp-lwt-unix (and (>= 5.0.0) :with-test))
+  (uri (and (>= 4.2) :with-test))))
