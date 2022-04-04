@@ -1,0 +1,38 @@
+(rule
+ (deps
+  (:gen %{bin:ocaml-swagger})
+  (:json petstore.json))
+ (target petstore.ml)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{gen}
+    -reference-base
+    #/definitions/
+    -reference-root
+    Definitions
+    %{json}))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff petstore.expected.ml petstore.ml)))
+
+(library
+ (name petstore)
+ (preprocess
+  (pps ppx_deriving_yojson))
+ (libraries
+  cohttp-lwt-unix
+  uri
+  lwt
+  ppx_deriving_yojson.runtime
+  re.pcre
+  yojson)
+ (modules petstore))
+
+(test
+ (name tests)
+ (libraries petstore)
+ (modules tests))
