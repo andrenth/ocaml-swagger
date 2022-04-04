@@ -230,16 +230,19 @@ type path_item =
 
 type paths = (string <ocaml valid="Swagger_util.Validate.path"> * path_item) list <json repr="object">
 
-type security_scheme_type =
-  [ Basic  <json name="basic">
-  | ApiKey <json name="apiKey">
-  | OAuth2 <json name="oauth2">
-  ]
+type security_scheme_basic =
+  { ?description : string option }
 
 type security_scheme_location =
   [ Query  <json name="query">
   | Header <json name="header">
   ]
+
+type security_scheme_api_key =
+  { ?description : string option
+  ; name : string
+  ; location <json name="in"> : security_scheme_location
+  }
 
 type security_scheme_flow =
   [ Implicit    <json name="implicit">
@@ -250,19 +253,19 @@ type security_scheme_flow =
 
 type scopes = (string * string) list <json repr="object">
 
-(* The Swagger 2.0 spec says all fields in the Security Scheme Object are required, except
-   "description". However, the Kubernetes spec includes neither flow, authorization, tokenUrl
-   nor scopes. *)
-type security_scheme =
-  { kind <json name="type"> : security_scheme_type
-  ; ?description : string option
-  ; name : string
-  ; location <json name="in"> : security_scheme_location
-  ; ?flow : security_scheme_flow option
+type security_scheme_oauth2 =
+  { ?description : string option
+  ; flow : security_scheme_flow
   ; ?authorization_url <json name="authorizationUrl"> : string <ocaml valid="Swagger_util.Validate.url"> option
   ; ?token_url <json name="tokenUrl"> : string <ocaml valid="Swagger_util.Validate.url"> option
-  ; ?scopes : scopes option
+  ; scopes : scopes
   }
+
+type security_scheme =
+  [ Basic  <json name="basic"> of security_scheme_basic
+  | ApiKey <json name="apiKey"> of security_scheme_api_key
+  | OAuth2 <json name="oauth2"> of security_scheme_oauth2
+  ] <json adapter.ocaml="Atdgen_runtime.Json_adapter.Type_field">
 
 type security_definitions = (string * security_scheme) list <json repr="object">
 
