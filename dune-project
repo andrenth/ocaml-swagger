@@ -20,4 +20,5 @@
   (yojson (>= 1.7.0))
   (ppx_deriving_yojson (and (>= 3.6.1) :with-test))
   (cohttp-lwt-unix (and (>= 5.0.0) :with-test))
-  (uri (and (>= 4.2) :with-test))))
+  (uri (and (>= 4.2) :with-test))
+  (ocamlformat :with-test)))
