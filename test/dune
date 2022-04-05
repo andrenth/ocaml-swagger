@@ -2,17 +2,29 @@
  (deps
   (:gen %{bin:ocaml-swagger})
   (:json petstore.json))
+ (target petstore.gen.ml)
+ (action
+  (run
+   %{gen}
+   -reference-base
+   #/definitions/
+   -reference-root
+   Definitions
+   %{json}
+   -o
+   %{target})))
+
+(rule
+ (deps petstore.gen.ml)
  (target petstore.ml)
  (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{gen}
-    -reference-base
-    #/definitions/
-    -reference-root
-    Definitions
-    %{json}))))
+  (run
+   ocamlformat
+   --impl
+   --profile=default
+   --ocaml-version=%{ocaml_version}
+   --output=%{target}
+   %{deps})))
 
 (rule
  (alias runtest)
