@@ -274,13 +274,13 @@ module Impl = struct
     match body_params with
     | [] -> "None"
     | [ p ] ->
-        let to_yojson =
+        let yojson_of_t =
           param_type p |> String.split_on_char '.' |> unsnoc |> Option.get
-          |> fst |> String.concat "." |> sprintf "%s.to_yojson"
+          |> fst |> String.concat "." |> sprintf "%s.yojson_of_t"
         in
         String.trim
         @@ sprintf {| Some (Body.of_string (Yojson.Safe.to_string (%s %s))) |}
-             to_yojson (param_name p)
+             yojson_of_t (param_name p)
     | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
 
   let string_of_http_verb = function
@@ -318,7 +318,7 @@ module Impl = struct
             {|
         Client.%s ?ctx ?headers%s uri >>= %s
         let json = Yojson.Safe.from_string body in
-        Lwt.return (if code >= 200 && code < 300 then %s.of_yojson json else Error body)
+        Lwt.return (if code >= 200 && code < 300 then %s.t_of_yojson json else Error body)
       |}
             client_fun body_param result_cont module_name
       | Type type_name ->

@@ -44,24 +44,24 @@ module Impl = struct
   let record name fields = Record (name, fields)
   let unspecified name = Unspecified name
 
-  let int_or_string_to_yojson =
+  let yojson_of_int_or_string =
     {|
-    let to_yojson t =
+    let yojson_of_t t =
       match Yojson.Safe.from_string t with
       (* Valid JSON integer. *)
       | (`Int _) as int -> int
 
-      (* Not a valid JSON integer, use original to_yojson function. *)
-      | _ -> to_yojson t
-      | exception Yojson.Json_error _ -> to_yojson t
+      (* Not a valid JSON integer, use original yojson_of_t function. *)
+      | _ -> yojson_of_t t
+      | exception Yojson.Json_error _ -> yojson_of_t t
   |}
 
   let int_or_string_of_yojson =
     {|
-    let of_yojson j =
+    let t_of_yojson j =
       match j with
-      | `Int _ -> Ok (Yojson.Safe.to_string j)
-      | _ -> of_yojson j
+      | `Int _ -> Yojson.Safe.to_string j
+      | _ -> t_of_yojson j
   |}
 
   let to_string ?(indent = 0) t =
@@ -84,7 +84,7 @@ module Impl = struct
 
         let type_ = sprintf "%stype %s = %s" pad name target in
         sprintf "%s [@@deriving yojson]\n\n%s\n\n%s" type_
-          int_or_string_to_yojson int_or_string_of_yojson
+          yojson_of_int_or_string int_or_string_of_yojson
     | Record (name, fields) ->
         let s =
           List.fold_left
