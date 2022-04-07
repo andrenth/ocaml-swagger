@@ -34,14 +34,8 @@
 (library
  (name petstore)
  (preprocess
-  (pps ppx_deriving_yojson))
- (libraries
-  cohttp-lwt-unix
-  uri
-  lwt
-  ppx_deriving_yojson.runtime
-  re.pcre
-  yojson)
+  (pps ppx_yojson_conv))
+ (libraries cohttp-lwt-unix uri lwt ppx_yojson_conv re.pcre yojson)
  (modules petstore))
 
 (test

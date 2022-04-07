@@ -2,8 +2,8 @@ module Object = struct
   module type Value = sig
     type value
 
-    val value_of_yojson : Yojson.Safe.t -> (value, string) result
-    val value_to_yojson : value -> Yojson.Safe.t
+    val value_of_yojson : Yojson.Safe.t -> value
+    val yojson_of_value : value -> Yojson.Safe.t
   end
 
   module type S = sig
@@ -14,18 +14,19 @@ module Object = struct
   module Make (V : Value) : S with type value := V.value = struct
     type t = (string * V.value) list [@@deriving yojson]
 
-    let to_yojson obj =
-      `Assoc (List.map (fun (k, v) -> (k, V.value_to_yojson v)) obj)
+    let yojson_of_t obj =
+      `Assoc (List.map (fun (k, v) -> (k, V.yojson_of_value v)) obj)
 
-    let of_yojson (obj : Yojson.Safe.t) : (t, string) result =
+    let t_of_yojson (obj : Yojson.Safe.t) : t =
       let rec loop acc = function
-        | [] -> Ok (List.rev acc)
-        | (k, v) :: obj -> (
-            match V.value_of_yojson v with
-            | Ok v -> loop ((k, v) :: acc) obj
-            | Error e -> Error ("invalid object:" ^ e))
+        | [] -> List.rev acc
+        | (k, v) :: obj ->
+            let v = V.value_of_yojson v in
+            loop ((k, v) :: acc) obj
       in
-      match obj with `Assoc obj -> loop [] obj | _ -> Error "invalid object"
+      match obj with
+      | `Assoc obj -> loop [] obj
+      | _ -> invalid_arg "invalid object"
   end
 
   module Of_strings = Make (struct
@@ -676,7 +677,7 @@ end = struct
           (Some
              (Body.of_string
                 (Yojson.Safe.to_string
-                   (Swagger_petstore.Definitions.Pet.to_yojson body))))
+                   (Swagger_petstore.Definitions.Pet.yojson_of_t body))))
         uri
       >>= fun (resp, body) ->
       let code = resp |> Response.status |> Code.code_of_status in
@@ -712,7 +713,7 @@ end = struct
           (Some
              (Body.of_string
                 (Yojson.Safe.to_string
-                   (Swagger_petstore.Definitions.Pet.to_yojson body))))
+                   (Swagger_petstore.Definitions.Pet.yojson_of_t body))))
         uri
       >>= fun (resp, body) ->
       let code = resp |> Response.status |> Code.code_of_status in
@@ -787,7 +788,7 @@ end = struct
             (Some
                (Body.of_string
                   (Yojson.Safe.to_string
-                     (Swagger_petstore.Definitions.Order.to_yojson body))))
+                     (Swagger_petstore.Definitions.Order.yojson_of_t body))))
           uri
         >>= fun (resp, body) ->
         let code = resp |> Response.status |> Code.code_of_status in
@@ -795,7 +796,7 @@ end = struct
         let json = Yojson.Safe.from_string body in
         Lwt.return
           (if code >= 200 && code < 300 then
-           Swagger_petstore.Definitions.Order.of_yojson json
+           Swagger_petstore.Definitions.Order.t_of_yojson json
           else Error body)
     end
   end
@@ -830,7 +831,7 @@ end = struct
             (Some
                (Body.of_string
                   (Yojson.Safe.to_string
-                     (Swagger_petstore.Definitions.User.to_yojson body))))
+                     (Swagger_petstore.Definitions.User.yojson_of_t body))))
           uri
         >>= fun (resp, body) ->
         let code = resp |> Response.status |> Code.code_of_status in
@@ -870,7 +871,7 @@ end = struct
             (Some
                (Body.of_string
                   (Yojson.Safe.to_string
-                     (Swagger_petstore.Definitions.User.to_yojson body))))
+                     (Swagger_petstore.Definitions.User.yojson_of_t body))))
           uri
         >>= fun (resp, body) ->
         let code = resp |> Response.status |> Code.code_of_status in
@@ -975,7 +976,7 @@ end = struct
           (Some
              (Body.of_string
                 (Yojson.Safe.to_string
-                   (Swagger_petstore.Definitions.User.to_yojson body))))
+                   (Swagger_petstore.Definitions.User.yojson_of_t body))))
         uri
       >>= fun (resp, body) ->
       let code = resp |> Response.status |> Code.code_of_status in
