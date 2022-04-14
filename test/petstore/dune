@@ -1,7 +1,7 @@
 (rule
  (deps
   (:gen %{bin:ocaml-swagger})
-  (:json petstore.json))
+  (:json swagger.json))
  (target petstore.gen.ml)
  (action
   (run
@@ -38,7 +38,7 @@
  (libraries cohttp-lwt-unix uri lwt ppx_yojson_conv re.pcre yojson)
  (modules petstore))
 
-(test
- (name tests)
+(tests
+ (names test)
  (libraries petstore)
- (modules tests))
+ (modules test))

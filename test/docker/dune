@@ -1,0 +1,44 @@
+(rule
+ (deps
+  (:gen %{bin:ocaml-swagger})
+  (:json swagger.json))
+ (target docker.gen.ml)
+ (action
+  (run
+   %{gen}
+   -reference-base
+   #/definitions/
+   -reference-root
+   Definitions
+   %{json}
+   -o
+   %{target})))
+
+(rule
+ (deps docker.gen.ml)
+ (target docker.ml)
+ (action
+  (run
+   ocamlformat
+   --impl
+   --profile=default
+   --ocaml-version=%{ocaml_version}
+   --output=%{target}
+   %{deps})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff docker.expected.ml docker.ml)))
+
+(library
+ (name docker)
+ (preprocess
+  (pps ppx_yojson_conv))
+ (libraries cohttp-lwt-unix uri lwt ppx_yojson_conv re.pcre yojson)
+ (modules docker))
+
+(tests
+ (names test)
+ (libraries docker)
+ (modules test))

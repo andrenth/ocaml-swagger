@@ -1,0 +1,46 @@
+(rule
+ (deps
+  (:gen %{bin:ocaml-swagger})
+  (:json swagger.json))
+ (target k8s.gen.ml)
+ (action
+  (run
+   %{gen}
+   -reference-base
+   #/definitions/io.k8s.
+   -reference-root
+   Definitions
+   -definition
+   io.k8s.
+   %{json}
+   -o
+   %{target})))
+
+(rule
+ (deps k8s.gen.ml)
+ (target k8s.ml)
+ (action
+  (run
+   ocamlformat
+   --impl
+   --profile=default
+   --ocaml-version=%{ocaml_version}
+   --output=%{target}
+   %{deps})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff k8s.expected.ml k8s.ml)))
+
+(library
+ (name k8s)
+ (preprocess
+  (pps ppx_yojson_conv))
+ (libraries cohttp-lwt-unix uri lwt ppx_yojson_conv re.pcre yojson)
+ (modules k8s))
+
+(tests
+ (names test)
+ (libraries k8s)
+ (modules test))
