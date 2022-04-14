@@ -102,6 +102,19 @@ module Impl = struct
         in
         let t = Ast_builder.(pstr_type Recursive [ t ]) in
         [ t; yojson_of_int_or_string; int_or_string_of_yojson ]
+    | Record (name, []) ->
+        let t =
+          let name = Ast_builder.Located.mk name in
+          Ast_builder.type_declaration ~name ~kind:Ptype_abstract
+            ~manifest:(Some [%type: unit])
+            ~params:[] ~cstrs:[] ~private_:Public
+        in
+        Ast_builder.(pstr_type Recursive [ t ])
+        :: [%str
+             let yojson_of_t () = `Assoc []
+
+             let t_of_yojson = function
+               | `Assoc [] | _ -> invalid_arg "Expected empty object"]
     | Record (name, fields) ->
         let labels =
           List.rev_map

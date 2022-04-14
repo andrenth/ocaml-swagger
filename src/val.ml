@@ -72,6 +72,7 @@ module Sig = struct
   let to_sig { name; params; return; kind; descr } =
     let params =
       match kind with
+      | Pure when params = [] -> [ nolabel [%type: unit] ]
       | Pure -> params
       | Http_request ->
           let ctx = optional "ctx" [%type: Cohttp_lwt_unix.Client.ctx] in
@@ -475,6 +476,7 @@ module Impl = struct
           Ast_builder.(pexp_fun (Optional p.name) None (pvar p.name) k)
     in
     let rec aux acc = function
+      | [] when params = [] -> [%expr fun () -> ()]
       | [] -> acc
       | [ ((Optional _ | Labelled _) as p) ] ->
           (* extra () param if last one is optional or labelled *)
