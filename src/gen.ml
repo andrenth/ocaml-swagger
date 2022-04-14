@@ -294,7 +294,8 @@ let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
 let rec build_definitions ~root ~definition_base ~reference_base l =
   match l with
   | [] -> root
-  | (name, (schema : Swagger_t.schema)) :: defs when schema.ref = None -> (
+  | (name, (schema : Swagger_t.schema)) :: defs when schema.reference = None
+    -> (
       let parents_and_child =
         name |> Mod.strip_base definition_base |> Mod.split_ref |> unsnoc
       in

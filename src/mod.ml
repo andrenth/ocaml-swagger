@@ -139,17 +139,18 @@ let strip_base base path =
     else path
   else path
 
-let split_ref ref =
-  ref |> String.split_on_char '.'
+let split_ref reference =
+  reference |> String.split_on_char '.'
   |> List.filter (( <> ) "")
   |> List.map module_name
 
-let reference_module_path ~reference_base ~reference_root ref =
-  let path = ref |> strip_base reference_base |> split_ref in
+let reference_module_path ~reference_base ~reference_root reference =
+  let path = reference |> strip_base reference_base |> split_ref in
   qualified_name reference_root :: path
 
-let reference_module ~reference_base ~reference_root ref =
-  reference_module_path ~reference_base ~reference_root ref |> String.concat "."
+let reference_module ~reference_base ~reference_root reference =
+  reference_module_path ~reference_base ~reference_root reference
+  |> String.concat "."
 
-let reference_type ~reference_base ~reference_root ref =
-  reference_module ~reference_base ~reference_root ref ^ ".t"
+let reference_type ~reference_base ~reference_root reference =
+  reference_module ~reference_base ~reference_root reference ^ ".t"

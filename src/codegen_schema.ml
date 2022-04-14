@@ -10,12 +10,12 @@ type t = {
 let create ~reference_base ~reference_root raw =
   { raw; reference_base; reference_root }
 
-let reference t = t.raw.ref
+let reference t = t.raw.reference
 
 let rec to_type t =
   let reference_base = t.reference_base in
   let reference_root = t.reference_root in
-  match t.raw.ref with
+  match t.raw.reference with
   | Some r ->
       let t = Mod.reference_type ~reference_base ~reference_root r in
       Ast_builder.(ptyp_constr (Located.lident t) [])
@@ -29,7 +29,7 @@ let rec to_type t =
           let open Swagger_t in
           match t.raw.additional_properties with
           | Some props -> (
-              match (props.ref, props.kind) with
+              match (props.reference, props.kind) with
               | Some r, _ ->
                   let t =
                     Mod.reference_module ~reference_base ~reference_root r
