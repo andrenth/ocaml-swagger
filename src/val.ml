@@ -270,11 +270,10 @@ module Impl = struct
       |> assoc_string
     in
     [%expr
-      let open Printf in
       let path_params = [%e path_params] in
       List.fold_left
         (fun path (name, value) ->
-          let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+          let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
           Re.replace_string re ~by:value path)
         (request_path_template ()) path_params]
 
@@ -287,7 +286,7 @@ module Impl = struct
           let headers =
             match headers with Some hs -> hs | None -> Header.init ()
           in
-          Some (Header.add_list headers [%e headers])]
+          Some (Cohttp.Header.add_list headers [%e headers])]
 
   let make_body params =
     let body_params =
@@ -320,7 +319,8 @@ module Impl = struct
               [%expr [%e yojson_of_t] [%e name]]
           | _ -> assert false
         in
-        [%expr Some (Body.of_string (Yojson.Safe.to_string [%e conv]))]
+        [%expr
+          Some (Cohttp_lwt.Body.of_string (Yojson.Safe.to_string [%e conv]))]
     | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
 
   let string_of_http_verb = function
@@ -333,21 +333,28 @@ module Impl = struct
     | Options -> "options"
 
   let client_function_of_http_verb = function
-    | Options -> [%expr Client.call `OPTIONS]
-    | verb -> Ast_builder.evar ("Client." ^ string_of_http_verb verb)
+    | Options -> [%expr Cohttp_lwt_unix.Client.call `OPTIONS]
+    | verb ->
+        Ast_builder.evar ("Cohttp_lwt_unix.Client." ^ string_of_http_verb verb)
 
   let continuation_of_http_verb k = function
     | Head ->
         [%expr
           fun resp ->
-            let code = resp |> Response.status |> Code.code_of_status in
+            let code =
+              resp |> Cohttp_lwt_unix.Response.status
+              |> Cohttp.Code.code_of_status
+            in
             let body = "Ok" in
             [%e k]]
     | _ ->
         [%expr
           fun (resp, body) ->
-            let code = resp |> Response.status |> Code.code_of_status in
-            Body.to_string body >>= fun body -> [%e k]]
+            let code =
+              resp |> Cohttp_lwt_unix.Response.status
+              |> Cohttp.Code.code_of_status
+            in
+            Cohttp_lwt.Body.to_string body >>= fun body -> [%e k]]
 
   let make_response_code ?(body_param = false) ~return verb params =
     let params =
@@ -404,7 +411,9 @@ module Impl = struct
               else Error (string_of_int code))]
     in
     let result = continuation_of_http_verb return verb in
-    [%expr [%e client_fun] >>= [%e result]]
+    [%expr
+      let open Lwt.Infix in
+      [%e client_fun] >>= [%e result]]
 
   let build_http_request ?body_param ~return verb params =
     let query = make_query params
@@ -412,10 +421,6 @@ module Impl = struct
     and headers = make_headers params
     and response_code = make_response_code ?body_param ~return verb params in
     [%expr
-      let open Lwt.Infix in
-      let open Cohttp in
-      let open Cohttp_lwt_unix in
-      let module Body = Cohttp_lwt.Body in
       let query = [%e query] in
       let path = [%e path] in
       let full_path = Uri.path uri ^ path in
