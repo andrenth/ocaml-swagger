@@ -294,7 +294,7 @@ module Impl = struct
     in
     match body_params with
     | [] -> [%expr None]
-    | [ p ] ->
+    | [ p ] -> (
         let lident path ident =
           let last = Longident.last_exn path in
           let name = Longident.name path in
@@ -319,8 +319,17 @@ module Impl = struct
               [%expr [%e yojson_of_t] [%e name]]
           | _ -> assert false
         in
-        [%expr
-          Some (Cohttp_lwt.Body.of_string (Yojson.Safe.to_string [%e conv]))]
+        match p with
+        | Optional _ ->
+            [%expr
+              Option.map
+                (fun body ->
+                  Cohttp_lwt.Body.of_string (Yojson.Safe.to_string [%e conv]))
+                body]
+        | _ ->
+            [%expr
+              Some (Cohttp_lwt.Body.of_string (Yojson.Safe.to_string [%e conv]))]
+        )
     | _ -> failwith "Val.Impl.make_body: there can be only one body parameter"
 
   let string_of_http_verb = function
