@@ -103,7 +103,7 @@ type schema_kind =
   ]
 
 type schema =
-  { ?ref <json name="$ref"> : reference option
+  { ?reference <json name="$ref"> : reference option
   ; ?format : string option
   ; ?title : string option
   ; ?description : string option
