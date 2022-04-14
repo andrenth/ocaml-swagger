@@ -607,17 +607,12 @@ end = struct
       let request_path_template () = "/pet/findByStatus"
 
       let get ~status ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [ ("status", String.concat "," (Array.to_list status)) ] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -627,9 +622,12 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.get ?ctx ?headers uri >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.get ?ctx ?headers uri >>= fun (resp, body) ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
@@ -644,17 +642,12 @@ end = struct
       let request_path_template () = "/pet/findByTags"
 
       let get ~tags ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [ ("tags", String.concat "," (Array.to_list tags)) ] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -664,9 +657,12 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.get ?ctx ?headers uri >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.get ?ctx ?headers uri >>= fun (resp, body) ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
@@ -680,17 +676,12 @@ end = struct
     let request_path_template () = "/pet"
 
     let put ~body ?ctx ?headers uri =
-      let open Lwt.Infix in
-      let open Cohttp in
-      let open Cohttp_lwt_unix in
-      let module Body = Cohttp_lwt.Body in
       let query = [] in
       let path =
-        let open Printf in
         let path_params = [] in
         List.fold_left
           (fun path (name, value) ->
-            let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+            let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
             Re.replace_string re ~by:value path)
           (request_path_template ()) path_params
       in
@@ -700,33 +691,31 @@ end = struct
         Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
       in
       let headers = headers in
-      Client.put ?ctx ?headers
+      let open Lwt.Infix in
+      Cohttp_lwt_unix.Client.put ?ctx ?headers
         ?body:
           (Some
-             (Body.of_string
+             (Cohttp_lwt.Body.of_string
                 (Yojson.Safe.to_string
                    (Swagger_petstore.Definitions.Pet.yojson_of_t body))))
         uri
       >>= fun (resp, body) ->
-      let code = resp |> Response.status |> Code.code_of_status in
-      Body.to_string body >>= fun body ->
+      let code =
+        resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+      in
+      Cohttp_lwt.Body.to_string body >>= fun body ->
       ignore body;
       Lwt.return
         (if code >= 200 && code < 300 then Ok ()
         else Error (string_of_int code))
 
     let post ~body ?ctx ?headers uri =
-      let open Lwt.Infix in
-      let open Cohttp in
-      let open Cohttp_lwt_unix in
-      let module Body = Cohttp_lwt.Body in
       let query = [] in
       let path =
-        let open Printf in
         let path_params = [] in
         List.fold_left
           (fun path (name, value) ->
-            let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+            let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
             Re.replace_string re ~by:value path)
           (request_path_template ()) path_params
       in
@@ -736,16 +725,19 @@ end = struct
         Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
       in
       let headers = headers in
-      Client.post ?ctx ?headers
+      let open Lwt.Infix in
+      Cohttp_lwt_unix.Client.post ?ctx ?headers
         ?body:
           (Some
-             (Body.of_string
+             (Cohttp_lwt.Body.of_string
                 (Yojson.Safe.to_string
                    (Swagger_petstore.Definitions.Pet.yojson_of_t body))))
         uri
       >>= fun (resp, body) ->
-      let code = resp |> Response.status |> Code.code_of_status in
-      Body.to_string body >>= fun body ->
+      let code =
+        resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+      in
+      Cohttp_lwt.Body.to_string body >>= fun body ->
       ignore body;
       Lwt.return
         (if code >= 200 && code < 300 then Ok ()
@@ -757,17 +749,12 @@ end = struct
       let request_path_template () = "/store/inventory"
 
       let get ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -777,9 +764,12 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.get ?ctx ?headers uri >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.get ?ctx ?headers uri >>= fun (resp, body) ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
@@ -791,17 +781,12 @@ end = struct
       let request_path_template () = "/store/order"
 
       let post ~body ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -811,16 +796,19 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.post ?ctx ?headers
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.post ?ctx ?headers
           ?body:
             (Some
-               (Body.of_string
+               (Cohttp_lwt.Body.of_string
                   (Yojson.Safe.to_string
                      (Swagger_petstore.Definitions.Order.yojson_of_t body))))
           uri
         >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         let json = Yojson.Safe.from_string body in
         Lwt.return
           (if code >= 200 && code < 300 then
@@ -834,17 +822,12 @@ end = struct
       let request_path_template () = "/user/createWithArray"
 
       let post ~body ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -854,18 +837,21 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.post ?ctx ?headers
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.post ?ctx ?headers
           ?body:
             (Some
-               (Body.of_string
+               (Cohttp_lwt.Body.of_string
                   (Yojson.Safe.to_string
                      (`List
                        (List.map Swagger_petstore.Definitions.User.yojson_of_t
                           body)))))
           uri
         >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then Ok ()
@@ -876,17 +862,12 @@ end = struct
       let request_path_template () = "/user/createWithList"
 
       let post ~body ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -896,18 +877,21 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.post ?ctx ?headers
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.post ?ctx ?headers
           ?body:
             (Some
-               (Body.of_string
+               (Cohttp_lwt.Body.of_string
                   (Yojson.Safe.to_string
                      (`List
                        (List.map Swagger_petstore.Definitions.User.yojson_of_t
                           body)))))
           uri
         >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then Ok ()
@@ -918,17 +902,12 @@ end = struct
       let request_path_template () = "/user/login"
 
       let get ~username ~password ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [ ("username", username); ("password", password) ] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -938,9 +917,12 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.get ?ctx ?headers uri >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.get ?ctx ?headers uri >>= fun (resp, body) ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then Ok body
@@ -951,17 +933,12 @@ end = struct
       let request_path_template () = "/user/logout"
 
       let get ?ctx ?headers uri =
-        let open Lwt.Infix in
-        let open Cohttp in
-        let open Cohttp_lwt_unix in
-        let module Body = Cohttp_lwt.Body in
         let query = [] in
         let path =
-          let open Printf in
           let path_params = [] in
           List.fold_left
             (fun path (name, value) ->
-              let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+              let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
               Re.replace_string re ~by:value path)
             (request_path_template ()) path_params
         in
@@ -971,9 +948,12 @@ end = struct
           Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
         in
         let headers = headers in
-        Client.get ?ctx ?headers uri >>= fun (resp, body) ->
-        let code = resp |> Response.status |> Code.code_of_status in
-        Body.to_string body >>= fun body ->
+        let open Lwt.Infix in
+        Cohttp_lwt_unix.Client.get ?ctx ?headers uri >>= fun (resp, body) ->
+        let code =
+          resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+        in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then Ok ()
@@ -983,17 +963,12 @@ end = struct
     let request_path_template () = "/user"
 
     let post ~body ?ctx ?headers uri =
-      let open Lwt.Infix in
-      let open Cohttp in
-      let open Cohttp_lwt_unix in
-      let module Body = Cohttp_lwt.Body in
       let query = [] in
       let path =
-        let open Printf in
         let path_params = [] in
         List.fold_left
           (fun path (name, value) ->
-            let re = Re.Pcre.regexp (sprintf "\\{%s\\}" name) in
+            let re = Re.Pcre.regexp (Printf.sprintf "\\{%s\\}" name) in
             Re.replace_string re ~by:value path)
           (request_path_template ()) path_params
       in
@@ -1003,16 +978,19 @@ end = struct
         Uri.with_query' uri (List.filter (fun (_k, v) -> v <> "") query)
       in
       let headers = headers in
-      Client.post ?ctx ?headers
+      let open Lwt.Infix in
+      Cohttp_lwt_unix.Client.post ?ctx ?headers
         ?body:
           (Some
-             (Body.of_string
+             (Cohttp_lwt.Body.of_string
                 (Yojson.Safe.to_string
                    (Swagger_petstore.Definitions.User.yojson_of_t body))))
         uri
       >>= fun (resp, body) ->
-      let code = resp |> Response.status |> Code.code_of_status in
-      Body.to_string body >>= fun body ->
+      let code =
+        resp |> Cohttp_lwt_unix.Response.status |> Cohttp.Code.code_of_status
+      in
+      Cohttp_lwt.Body.to_string body >>= fun body ->
       ignore body;
       Lwt.return
         (if code >= 200 && code < 300 then Ok ()
