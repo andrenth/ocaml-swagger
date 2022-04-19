@@ -19,6 +19,20 @@ let type_declaration' ~name ~descr ~kind ~manifest =
   in
   { t with ptype_attributes }
 
+let type_declaration_yojson ~name ~descr =
+  let name = Ast_builder.Located.mk name in
+  let t =
+    Ast_builder.type_declaration ~name ~params:[] ~cstrs:[] ~private_:Public
+      ~kind:Ptype_abstract
+      ~manifest:(Some [%type: Yojson.Safe.t])
+  in
+  let ptype_attributes =
+    match descr with
+    | Some descr -> Util.ocaml_doc descr :: t.ptype_attributes
+    | None -> t.ptype_attributes
+  in
+  { t with ptype_attributes }
+
 module Sig = struct
   type t =
     | Abstract of string * string option
@@ -30,10 +44,16 @@ module Sig = struct
   let to_sig t =
     match t with
     | Abstract (name, descr) ->
-        type_declaration' ~name ~descr ~kind:Ptype_abstract ~manifest:None
+        let t =
+          type_declaration' ~name ~descr ~kind:Ptype_abstract ~manifest:None
+        in
+        [ Ast_builder.psig_type Recursive [ t ] ]
     | Unspecified (name, descr) ->
-        type_declaration' ~name ~descr ~kind:Ptype_abstract
-          ~manifest:(Some [%type: Yojson.Safe.t])
+        let t = type_declaration_yojson ~name ~descr in
+        Ast_builder.psig_type Recursive [ t ]
+        :: [%sig:
+             val yojson_of_t : t -> Yojson.Safe.t
+             val t_of_yojson : t -> Yojson.Safe.t]
 end
 
 module Impl = struct
@@ -76,11 +96,11 @@ module Impl = struct
   let to_impl t =
     match t with
     | Unspecified name ->
-        let t =
-          type_declaration' ~name ~descr:None ~kind:Ptype_abstract
-            ~manifest:(Some [%type: Yojson.Safe.t])
-        in
-        [ Ast_builder.(pstr_type Recursive [ t ]) ]
+        let t = type_declaration_yojson ~name ~descr:None in
+        Ast_builder.(pstr_type Recursive [ t ])
+        :: [%str
+             let t_of_yojson = Fun.id
+             let yojson_of_t = Fun.id]
     | Alias { name; target; int_or_string = false } ->
         let t =
           type_declaration' ~name ~descr:None ~kind:Ptype_abstract

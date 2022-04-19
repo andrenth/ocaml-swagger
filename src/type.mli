@@ -14,7 +14,7 @@ module Sig : sig
       if provided. *)
 
   val unspecified : ?descr:string -> string -> t
-  val to_sig : t -> Ppxlib.Ast.type_declaration
+  val to_sig : t -> Ppxlib.Ast.signature
 end
 
 (** {1 Implementation types} *)
