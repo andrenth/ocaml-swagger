@@ -441,11 +441,19 @@ end = struct
 
       let make ?message ?type_ ?code () = { code; type_; message }
       let code t = t.code
-      let set_code code t = { t with code }
+
+      let set_code code t =
+        { t with code } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let type_ t = t.type_
-      let set_type_ type_ t = { t with type_ }
+
+      let set_type_ type_ t =
+        { t with type_ } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let message t = t.message
-      let set_message message t = { t with message }
+
+      let set_message message t =
+        { t with message } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
 
       module Object = Object.Make (struct
         type value = t [@@deriving yojson]
@@ -461,9 +469,14 @@ end = struct
 
       let make ?name ?id () = { id; name }
       let id t = t.id
-      let set_id id t = { t with id }
+
+      let set_id id t =
+        { t with id } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let name t = t.name
-      let set_name name t = { t with name }
+
+      let set_name name t =
+        { t with name } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
 
       module Object = Object.Make (struct
         type value = t [@@deriving yojson]
@@ -485,17 +498,34 @@ end = struct
         { id; pet_id; quantity; ship_date; status; complete }
 
       let id t = t.id
-      let set_id id t = { t with id }
+
+      let set_id id t =
+        { t with id } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let pet_id t = t.pet_id
-      let set_pet_id pet_id t = { t with pet_id }
+
+      let set_pet_id pet_id t =
+        { t with pet_id } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let quantity t = t.quantity
-      let set_quantity quantity t = { t with quantity }
+
+      let set_quantity quantity t =
+        { t with quantity } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let ship_date t = t.ship_date
-      let set_ship_date ship_date t = { t with ship_date }
+
+      let set_ship_date ship_date t =
+        { t with ship_date } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let status t = t.status
-      let set_status status t = { t with status }
+
+      let set_status status t =
+        { t with status } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let complete t = t.complete
-      let set_complete complete t = { t with complete }
+
+      let set_complete complete t =
+        { t with complete } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
 
       module Object = Object.Make (struct
         type value = t [@@deriving yojson]
@@ -518,17 +548,34 @@ end = struct
         { id; category; name; photo_urls; tags; status }
 
       let id t = t.id
-      let set_id id t = { t with id }
+
+      let set_id id t =
+        { t with id } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let category t = t.category
-      let set_category category t = { t with category }
+
+      let set_category category t =
+        { t with category } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let name t = t.name
-      let set_name name t = { t with name }
+
+      let set_name name t =
+        { t with name } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let photo_urls t = t.photo_urls
-      let set_photo_urls photo_urls t = { t with photo_urls }
+
+      let set_photo_urls photo_urls t =
+        { t with photo_urls } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let tags t = t.tags
-      let set_tags tags t = { t with tags }
+
+      let set_tags tags t =
+        { t with tags } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let status t = t.status
-      let set_status status t = { t with status }
+
+      let set_status status t =
+        { t with status } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
 
       module Object = Object.Make (struct
         type value = t [@@deriving yojson]
@@ -544,9 +591,14 @@ end = struct
 
       let make ?name ?id () = { id; name }
       let id t = t.id
-      let set_id id t = { t with id }
+
+      let set_id id t =
+        { t with id } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let name t = t.name
-      let set_name name t = { t with name }
+
+      let set_name name t =
+        { t with name } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
 
       module Object = Object.Make (struct
         type value = t [@@deriving yojson]
@@ -580,21 +632,44 @@ end = struct
         }
 
       let id t = t.id
-      let set_id id t = { t with id }
+
+      let set_id id t =
+        { t with id } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let username t = t.username
-      let set_username username t = { t with username }
+
+      let set_username username t =
+        { t with username } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let first_name t = t.first_name
-      let set_first_name first_name t = { t with first_name }
+
+      let set_first_name first_name t =
+        { t with first_name } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let last_name t = t.last_name
-      let set_last_name last_name t = { t with last_name }
+
+      let set_last_name last_name t =
+        { t with last_name } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let email t = t.email
-      let set_email email t = { t with email }
+
+      let set_email email t =
+        { t with email } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let password t = t.password
-      let set_password password t = { t with password }
+
+      let set_password password t =
+        { t with password } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let phone t = t.phone
-      let set_phone phone t = { t with phone }
+
+      let set_phone phone t =
+        { t with phone } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
+
       let user_status t = t.user_status
-      let set_user_status user_status t = { t with user_status }
+
+      let set_user_status user_status t =
+        { t with user_status } [@ocaml.warning {ocamlswagger|-23|ocamlswagger}]
 
       module Object = Object.Make (struct
         type value = t [@@deriving yojson]

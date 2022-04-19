@@ -48,6 +48,16 @@ let ocaml_doc descr =
   let doc = pstr_eval [%expr [%e doc]] [] in
   attribute ~name ~payload:(PStr [ doc ])
 
+let ocaml_warning ~number =
+  let open Ast_builder in
+  let name = Located.mk "ocaml.warning" in
+  let doc =
+    pexp_constant
+      (Pconst_string ("-" ^ string_of_int number, loc, Some "ocamlswagger"))
+  in
+  let doc = pstr_eval [%expr [%e doc]] [] in
+  attribute ~name ~payload:(PStr [ doc ])
+
 let unsnoc l =
   let rec go acc = function
     | [] -> None
