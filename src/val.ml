@@ -456,7 +456,10 @@ module Impl = struct
     | Field_setter ->
         let ident = Ast_builder.Located.lident t.name in
         let exp = Ast_builder.pexp_ident ident in
-        Ast_builder.pexp_record [ (ident, exp) ] (Some [%expr t])
+        let t = Ast_builder.pexp_record [ (ident, exp) ] (Some [%expr t]) in
+        (* Silences OCaml warning 23 useless-record-with: Useless record with clause. *)
+        let pexp_attributes = ocaml_warning ~number:23 :: t.pexp_attributes in
+        { t with pexp_attributes }
     | Identity -> [%expr t]
     | Constant v -> Ast_builder.estring v
     | Http_request (Get, return) -> http_get ~return t.params
