@@ -77,10 +77,7 @@ let rec to_module_type m =
       (m.submodules |> StringMap.bindings)
   in
   let types =
-    List.rev_map
-      (fun t ->
-        Ast_builder.psig_type Recursive [ Type.Sig.to_sig (Type.signature t) ])
-      m.types
+    List.concat_map (fun t -> Type.Sig.to_sig (Type.signature t)) m.types
   in
   let values =
     List.rev_map
