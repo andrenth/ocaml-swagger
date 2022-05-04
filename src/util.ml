@@ -69,15 +69,6 @@ let unsnoc l =
 let keep_some l = List.filter_map Fun.id l
 let opt_cons o l = match o with Some o -> o :: l | None -> l
 
-let fold_left_map' f l =
-  let rec aux x acc = function
-    | [] -> (x, acc)
-    | hd :: tl ->
-        let x, acc = f x acc hd in
-        aux x acc tl
-  in
-  aux None [] l
-
 module StringMap = Map.Make (struct
   type t = string
 
