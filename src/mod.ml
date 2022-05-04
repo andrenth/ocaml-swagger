@@ -40,7 +40,7 @@ let with_values name ?(recursive = false) ?(path = []) values =
   create ~name ~recursive ~path ~values ()
 
 let name m = m.name
-let submodules m = m.submodules |> StringMap.bindings |> List.map snd
+let submodules m = StringMap.fold (fun _ -> List.cons) m.submodules []
 let add_vals vs m = { m with values = m.values @ vs }
 
 let add_mod subm m =
@@ -67,14 +67,14 @@ let object_module_impl =
 let rec to_module_type m =
   let open Ast_builder in
   let definitions, submods =
-    Util.fold_left_map'
-      (fun defs submods (name, m) ->
+    StringMap.fold
+      (fun name m (defs, submods) ->
         let type_ = to_module_type m in
         let decl = module_declaration ~name:(Located.mk (Some m.name)) ~type_ in
         let s = psig_module decl in
         (* Definitions first to simplify references *)
         if name = "Definitions" then (Some s, submods) else (defs, s :: submods))
-      (m.submodules |> StringMap.bindings)
+      m.submodules (None, [])
   in
   let types =
     List.concat_map (fun t -> Type.Sig.to_sig (Type.signature t)) m.types
@@ -98,11 +98,13 @@ let rec to_module_type m =
 
 let rec to_mod_structure m =
   let submods =
-    m.submodules |> StringMap.bindings
-    |> List.rev_map (fun (name, m) ->
-           let name = Ast_builder.Located.mk (Some name) in
-           Ast_builder.(
-             pstr_module (module_binding ~name ~expr:(to_mod_structure m))))
+    StringMap.fold
+      (fun name m mods ->
+        let name = Ast_builder.Located.mk (Some name) in
+        Ast_builder.(
+          pstr_module (module_binding ~name ~expr:(to_mod_structure m)))
+        :: mods)
+      m.submodules []
   in
   let types =
     List.concat_map (fun t -> Type.Impl.to_impl (Type.implementation t)) m.types
