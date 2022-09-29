@@ -294,9 +294,31 @@ let build_paths ~root ~path_base ~reference_base ~reference_root l =
       build_paths ~root ~path_base ~reference_base ~reference_root m)
     root l
 
-let build_definitions ~root ~definition_base ~reference_base (name, schema) =
-  match schema.Swagger_t.reference with
-  | None -> (
+let polymorphism ~root ~definition_base ~reference_base ~discriminator
+    (name, schema) =
+  ignore root;
+  ignore definition_base;
+  ignore reference_base;
+  ignore schema;
+  failwith
+    (sprintf
+       "allOf polymorphism (found in %s, discriminator %s) isn't supported" name
+       discriminator)
+
+let composition ~root ~reference_base ~name all_of =
+  ignore root;
+  ignore reference_base;
+  ignore all_of;
+  failwith (sprintf "allOf composition (found in %s) for isn't supported" name)
+
+let build_definitions ~root ~definition_base ~reference_base def =
+  let name, schema = def in
+  match (schema.Swagger_t.discriminator, schema.all_of, schema.reference) with
+  | Some discriminator, None, None ->
+      polymorphism ~root ~definition_base ~reference_base ~discriminator def
+  | None, Some all_of, None ->
+      Mod.add_mod (composition ~root ~reference_base ~name all_of) root
+  | None, None, None -> (
       let parents_and_child =
         name |> Mod.strip_base definition_base |> Mod.split_ref |> unsnoc
       in
@@ -311,12 +333,13 @@ let build_definitions ~root ~definition_base ~reference_base (name, schema) =
           Mod.add_mod
             (definition_module ~root ~reference_base ~name schema)
             root)
-  (* XXX Ignore schemas that are simply references? Just use the referenced
-   * module? In the kubernetes API this seems to be only for deprecated
-   * stuff. *)
-  | Some reference ->
+  | None, None, Some reference ->
+      (* XXX Ignore schemas that are simply references? Just use the
+         referenced module? In the kubernetes API this seems to be only for
+         deprecated stuff. *)
       failwith
         (sprintf "Unimplemented reference support %s in %s." reference name)
+  | _ -> failwith (sprintf "Error in %s Schema Object definition" name)
 
 let build_definitions ~root ~definition_base ~reference_base l =
   List.fold_left

@@ -125,7 +125,7 @@ type schema =
   ; ?enum : t list option
   ; ?kind <json name="type"> : schema_kind option
   ; ?items : schema option
-  ; ?all_of <json name="allOf"> : t option
+  ; ?all_of <json name="allOf"> : schema list option
   ; ?properties : (string * schema) list <json repr="object"> option
   ; ?additional_properties <json name="additionalProperties"> : schema <json repr="object"> option
   ; ?discriminator : string option
