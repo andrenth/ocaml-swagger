@@ -15,22 +15,4 @@
  (public_name swagger)
  (preprocess
   (pps ppxlib.metaquot))
- (libraries atdgen ppxlib re.pcre yojson)
- (modules
-  Gen
-  Mod
-  Param
-  Codegen_schema
-  Swagger
-  Swagger_j
-  Swagger_t
-  Swagger_util
-  Type
-  Util
-  Val))
-
-(executable
- (name main)
- (public_name ocaml-swagger)
- (libraries swagger)
- (modules main))
+ (libraries atdgen ppxlib re.pcre yojson))
