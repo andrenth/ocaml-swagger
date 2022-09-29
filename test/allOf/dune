@@ -1,0 +1,84 @@
+(rule
+ (deps
+  (:gen %{bin:ocaml-swagger})
+  (:json composition.json))
+ (target composition.gen.ml)
+ (action
+  (run
+   %{gen}
+   -reference-base
+   #/definitions/
+   -reference-root
+   Definitions
+   %{json}
+   -o
+   %{target})))
+
+(rule
+ (deps composition.gen.ml)
+ (target composition.ml)
+ (action
+  (run
+   ocamlformat
+   --impl
+   --profile=default
+   --ocaml-version=%{ocaml_version}
+   --output=%{target}
+   %{deps})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff composition.expected.ml composition.ml)))
+
+(library
+ (name composition)
+ (preprocess
+  (pps ppx_yojson_conv))
+ (libraries cohttp-lwt-unix uri lwt ppx_yojson_conv re.pcre yojson)
+ (modules composition))
+
+(rule
+ (deps
+  (:gen %{bin:ocaml-swagger})
+  (:json polymorphism.json))
+ (target polymorphism.gen.ml)
+ (action
+  (run
+   %{gen}
+   -reference-base
+   #/definitions/
+   -reference-root
+   Definitions
+   %{json}
+   -o
+   %{target})))
+
+(rule
+ (deps polymorphism.gen.ml)
+ (target polymorphism.ml)
+ (action
+  (run
+   ocamlformat
+   --impl
+   --profile=default
+   --ocaml-version=%{ocaml_version}
+   --output=%{target}
+   %{deps})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff polymorphism.expected.ml polymorphism.ml)))
+
+(library
+ (name polymorphism)
+ (preprocess
+  (pps ppx_yojson_conv))
+ (libraries cohttp-lwt-unix uri lwt ppx_yojson_conv re.pcre yojson)
+ (modules polymorphism))
+
+(tests
+ (names test)
+ (libraries composition polymorphism)
+ (modules test))
