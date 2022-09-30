@@ -25,7 +25,7 @@ let module_name s =
 let create ~name ?descr ?(recursive = false) ?(path = []) ?(types = [])
     ?(submodules = StringMap.empty) ?(values = []) () =
   {
-    name = module_name name;
+    name = (if name <> "" then module_name name else "");
     path = List.map module_name path;
     types;
     values;
@@ -48,6 +48,57 @@ let add_mod subm m =
   { m with submodules = StringMap.add subm.name subm m.submodules }
 
 let find_submodule name m = StringMap.find_opt (module_name name) m.submodules
+
+let compose ~name mods =
+  let find_split modname p = function
+    | t :: l when p t -> (t, l)
+    | _ ->
+        failwith
+          (sprintf "Couldn't find ident from %s, maybe it was reordered?"
+             modname)
+  in
+  let compose split compose xs =
+    let found_idents, idents = xs |> List.map split |> List.split in
+    let ident =
+      match found_idents with
+      | [] -> assert false
+      | [ x ] -> x
+      | x :: l -> List.fold_left (fun acc x -> compose acc x) x l
+    in
+    ident :: List.flatten idents
+  in
+  let types =
+    compose
+      (fun { name; types; _ } ->
+        find_split name (fun t -> Type.name t = "t") types)
+      Type.compose mods
+  in
+  let values =
+    compose
+      (fun { name; values; _ } ->
+        find_split name (fun t -> Val.name t = "make") values)
+      Val.compose mods
+  in
+  let submodules =
+    List.fold_left
+      (fun acc m ->
+        StringMap.union
+          (fun _ y ->
+            failwith
+              (sprintf "Submodule %s already exists in composition." y.name))
+          acc m.submodules)
+      StringMap.empty mods
+  in
+  {
+    name;
+    path = [];
+    types;
+    values;
+    submodules;
+    recursive = false;
+    descr = None;
+  }
+
 let path m = m.path
 
 let qualified_name m =

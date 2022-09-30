@@ -24,6 +24,7 @@ val qualified_path : t -> string list
 val add_mod : t -> t -> t
 val add_vals : Val.t list -> t -> t
 val find_submodule : string -> t -> t option
+val compose : name:string -> t list -> t
 
 val reference_module :
   reference_base:string -> reference_root:t -> string -> string
