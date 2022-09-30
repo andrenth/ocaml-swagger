@@ -170,16 +170,18 @@ module Impl = struct
     | "options" -> Options
     | op -> failwith ("unknown HTTP verb: " ^ op)
 
-  let record_constructor_body params =
-    let fields =
-      List.fold_left
-        (fun acc param ->
-          let ident = Ast_builder.Located.lident (param_name param) in
-          let exp = Ast_builder.pexp_ident ident in
-          (ident, exp) :: acc)
-        [] params
-    in
-    Ast_builder.pexp_record (List.rev fields) None
+  let record_constructor_body = function
+    | [] -> Ast_builder.eunit
+    | params ->
+        let fields =
+          List.fold_left
+            (fun acc param ->
+              let ident = Ast_builder.Located.lident (param_name param) in
+              let exp = Ast_builder.pexp_ident ident in
+              (ident, exp) :: acc)
+            [] params
+        in
+        Ast_builder.pexp_record fields None
 
   (* FIXME: take into account collectionFormat *)
 

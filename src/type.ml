@@ -123,8 +123,7 @@ module Impl = struct
             fields
         in
         let t =
-          type_declaration' ~name ~descr:None
-            ~kind:(Ptype_record (List.rev labels))
+          type_declaration' ~name ~descr:None ~kind:(Ptype_record labels)
             ~manifest:None
         in
         [ Ast_builder.(pstr_type Recursive [ t ]) ]
