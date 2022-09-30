@@ -171,3 +171,19 @@ let name t =
 
 let signature t = t.signature
 let implementation t = t.implementation
+
+let compose t1 t2 =
+  match (t1.signature, t2.signature, t1.implementation, t2.implementation) with
+  | ( Sig.Abstract (sig_name1, descr1),
+      Sig.Abstract (sig_name2, descr2),
+      Impl.Record (impl_name1, fields1),
+      Impl.Record (impl_name2, fields2) )
+    when sig_name1 = sig_name2 && impl_name1 = impl_name2 && descr1 = descr2 ->
+      let impl =
+        List.sort_uniq
+          (fun { Impl.name = name1; _ } { Impl.name = name2; _ } ->
+            String.compare name1 name2)
+          (fields1 @ fields2)
+      in
+      create (Sig.Abstract (sig_name1, descr1)) (Impl.Record (impl_name1, impl))
+  | _ -> invalid_arg "Could not compose types. Has the order changed?"

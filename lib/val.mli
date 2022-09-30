@@ -2,6 +2,7 @@ module Sig : sig
   type t
   type param
 
+  val name : t -> string
   val labelled : ?descr:string -> string -> Ppxlib.Ast.core_type -> param
   val optional : ?descr:string -> string -> Ppxlib.Ast.core_type -> param
   val nolabel : Ppxlib.Ast.core_type -> param
@@ -24,6 +25,7 @@ module Impl : sig
   type http_verb
   type return
 
+  val name : t -> string
   val labelled : ?origin:origin -> string -> Ppxlib.Ast.core_type -> param
   val optional : ?origin:origin -> string -> Ppxlib.Ast.core_type -> param
   val nolabel : string -> Ppxlib.Ast.core_type -> param
@@ -42,6 +44,8 @@ end
 
 type t
 
+val name : t -> string
 val create : Sig.t -> Impl.t -> t
 val signature : t -> Sig.t
 val implementation : t -> Impl.t
+val compose : t -> t -> t

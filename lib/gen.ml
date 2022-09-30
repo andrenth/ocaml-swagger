@@ -306,10 +306,24 @@ let polymorphism ~root ~definition_base ~reference_base ~discriminator
        discriminator)
 
 let composition ~root ~reference_base ~name all_of =
-  ignore root;
-  ignore reference_base;
-  ignore all_of;
-  failwith (sprintf "allOf composition (found in %s) for isn't supported" name)
+  List.map
+    (fun (schema : Swagger_t.schema) ->
+      match schema.reference with
+      | None -> definition_module ~root ~reference_base ~name:"" schema
+      | Some reference -> (
+          let child =
+            reference
+            |> Mod.strip_base reference_base
+            |> Mod.split_ref |> unsnoc |> Option.get |> snd
+          in
+          match Mod.find_submodule child root with
+          | Some m -> m
+          | None ->
+              failwith
+                (sprintf "Couldn't find submodule %s of %s." reference
+                   (Mod.name root))))
+    all_of
+  |> Mod.compose ~name
 
 let build_definitions ~root ~definition_base ~reference_base def =
   let name, schema = def in

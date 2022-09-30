@@ -22,6 +22,8 @@ module Sig = struct
     descr : string list;
   }
 
+  let name t = t.name
+
   let param_descr = function
     | Nolabel _
     | Labelled ({ descr = None; _ }, _)
@@ -138,6 +140,7 @@ module Impl = struct
 
   type t = { name : string; params : param list; kind : kind }
 
+  let name t = t.name
   let create kind name params = { kind; name; params }
   let record_constructor = create Record_constructor
   let field_getter = create Field_getter
@@ -507,6 +510,42 @@ end
 
 type t = { signature : Sig.t; implementation : Impl.t }
 
+let name t =
+  assert (Sig.name t.signature = Impl.name t.implementation);
+  Sig.name t.signature
+
 let create signature implementation = { signature; implementation }
 let signature t = t.signature
 let implementation t = t.implementation
+
+let compose t1 t2 =
+  match (t1.signature, t2.signature, t1.implementation, t2.implementation) with
+  | ( Sig.
+        { name = "make"; kind = Pure; params = sig_param1; return = return1; _ },
+      Sig.
+        {
+          name = "make";
+          kind = Pure;
+          params = sig_param2;
+          return = _return2;
+          _;
+        },
+      Impl.{ name = "make"; params = impl_params1; kind = kind1 },
+      Impl.{ name = "make"; params = impl_params2; kind = kind2 } )
+    when kind1 = kind2 && (kind1 = Record_constructor || kind1 = Identity) ->
+      let signature =
+        Sig.
+          {
+            name = "make";
+            kind = Pure;
+            params = sig_param1 @ sig_param2;
+            return = return1;
+            descr = [];
+          }
+      in
+      let implementation =
+        Impl.
+          { name = "make"; params = impl_params1 @ impl_params2; kind = kind1 }
+      in
+      create signature implementation
+  | _ -> invalid_arg "Could not compose values. Has the order changed?"

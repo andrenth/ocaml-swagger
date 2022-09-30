@@ -67,3 +67,6 @@ val signature : t -> Sig.t
 
 val implementation : t -> Impl.t
 (** The implementation type representation. *)
+
+val compose : t -> t -> t
+(** Compose two record types (merge and flatten). *)
