@@ -269,34 +269,34 @@ let rec insert_module m root = function
           let subm = Mod.empty p ~path:(Mod.qualified_path root) () in
           Mod.add_mod (insert_module m subm ps) root)
 
-let rec build_paths ~root ~path_base ~reference_base ~reference_root = function
-  | [] -> root
-  | (path, item) :: paths -> (
-      let parents_and_child =
-        path |> Mod.strip_base path_base |> String.split_on_char '/'
-        |> List.filter (( <> ) "")
-        |> unsnoc
+let build_paths ~root ~path_base ~reference_base ~reference_root (path, item) =
+  let parents_and_child =
+    path |> Mod.strip_base path_base |> String.split_on_char '/'
+    |> List.filter (( <> ) "")
+    |> unsnoc
+  in
+  match parents_and_child with
+  | Some (parents, child) ->
+      let child_values =
+        path_item_vals ~root ~reference_base ~reference_root ~path item
       in
-      match parents_and_child with
-      | Some (parents, child) ->
-          let child_values =
-            path_item_vals ~root ~reference_base ~reference_root ~path item
-          in
-          let child_module = Mod.with_values ~path:parents child child_values in
-          let root = insert_module child_module root parents in
-          build_paths ~root ~path_base ~reference_base ~reference_root paths
-      | None ->
-          let child_values =
-            path_item_vals ~root ~reference_base ~reference_root ~path item
-          in
-          let root = Mod.add_vals child_values root in
-          build_paths ~root ~path_base ~reference_base ~reference_root paths)
+      let child_module = Mod.with_values ~path:parents child child_values in
+      insert_module child_module root parents
+  | None ->
+      let child_values =
+        path_item_vals ~root ~reference_base ~reference_root ~path item
+      in
+      Mod.add_vals child_values root
 
-let rec build_definitions ~root ~definition_base ~reference_base l =
-  match l with
-  | [] -> root
-  | (name, (schema : Swagger_t.schema)) :: defs when schema.reference = None
-    -> (
+let build_paths ~root ~path_base ~reference_base ~reference_root l =
+  List.fold_left
+    (fun root m ->
+      build_paths ~root ~path_base ~reference_base ~reference_root m)
+    root l
+
+let build_definitions ~root ~definition_base ~reference_base (name, schema) =
+  match schema.Swagger_t.reference with
+  | None -> (
       let parents_and_child =
         name |> Mod.strip_base definition_base |> Mod.split_ref |> unsnoc
       in
@@ -306,20 +306,22 @@ let rec build_definitions ~root ~definition_base ~reference_base l =
             definition_module ~root ~reference_base ~path:parents ~name:child
               schema
           in
-          let root = insert_module def root parents in
-          build_definitions ~root ~definition_base ~reference_base defs
+          insert_module def root parents
       | None ->
-          let root =
-            Mod.add_mod
-              (definition_module ~root ~reference_base ~name schema)
-              root
-          in
-          build_definitions ~root ~definition_base ~reference_base defs)
+          Mod.add_mod
+            (definition_module ~root ~reference_base ~name schema)
+            root)
   (* XXX Ignore schemas that are simply references? Just use the referenced
    * module? In the kubernetes API this seems to be only for deprecated
    * stuff. *)
-  | (_name, (_schema : Swagger_t.schema)) :: defs ->
-      build_definitions ~root ~definition_base ~reference_base defs
+  | Some reference ->
+      failwith
+        (sprintf "Unimplemented reference support %s in %s." reference name)
+
+let build_definitions ~root ~definition_base ~reference_base l =
+  List.fold_left
+    (fun root m -> build_definitions ~root ~definition_base ~reference_base m)
+    root l
 
 let of_swagger ?(path_base = "") ?(definition_base = "") ?(reference_base = "")
     ~reference_root s =
