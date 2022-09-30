@@ -1,11 +1,10 @@
-open Printf
-
 let codegen_from_string ~path_base ~definition_base ~reference_base
     ~reference_root ?(output = stdout) input =
   let swagger = Swagger_j.swagger_of_string input in
   Gen.of_swagger ~path_base ~definition_base ~reference_base ~reference_root
     swagger
-  |> Gen.to_string |> fprintf output "%s%!"
+  |> Gen.to_string
+  |> Printf.fprintf output "%s%!"
 
 let read_channel input =
   let buffer = Buffer.create 4096 in

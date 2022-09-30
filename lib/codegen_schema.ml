@@ -1,5 +1,6 @@
-open Printf
 open Util
+
+let sprintf = Printf.sprintf
 
 type t = {
   raw : Swagger_t.schema;

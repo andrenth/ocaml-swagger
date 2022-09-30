@@ -1,5 +1,6 @@
-open Printf
 open Util
+
+let sprintf = Printf.sprintf
 
 let merge_params (ps1 : Swagger_t.parameter list)
     (ps2 : Swagger_t.parameter list) =
