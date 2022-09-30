@@ -1,4 +1,4 @@
-open Printf
+let sprintf = Printf.sprintf
 
 let snake_case =
   let re1 = Re.Pcre.regexp "([A-Z]+)([A-Z][a-z]{2,})" in

@@ -1,6 +1,7 @@
-open Printf
 open Ppxlib
 open Util
+
+let sprintf = Printf.sprintf
 
 type t = {
   name : string;

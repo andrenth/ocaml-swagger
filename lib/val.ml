@@ -1,6 +1,7 @@
 open Ppxlib
-open Printf
 open Util
+
+let sprintf = Printf.sprintf
 
 module Sig = struct
   type kind = Pure | Http_request
