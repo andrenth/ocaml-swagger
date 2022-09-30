@@ -15,4 +15,4 @@
  (public_name swagger)
  (preprocess
   (pps ppxlib.metaquot))
- (libraries atdgen ppxlib re.pcre yojson))
+ (libraries atdgen ppxlib re.pcre yojson ISO8601))

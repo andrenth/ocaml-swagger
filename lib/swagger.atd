@@ -1,5 +1,30 @@
 type t <ocaml module="Yojson.Safe"> = abstract
 
+type format =
+  [ Int32     <json name="int32">
+  | Int64     <json name="int64">
+  | Float     <json name="float">
+  | Double    <json name="double">
+  | Byte      <json name="byte">
+  | Binary    <json name="binary">
+  | Date      <json name="date">
+  | Date_time <json name="date-time">
+  | Password  <json name="password">
+  | File      <json name="format">
+  | Email     <json name="email">
+  | Hostname  <json name="hostname">
+  | IPv4      <json name="ipv4">
+  | IPv6      <json name="ipv6">
+  | Uri       <json name="uri">
+  | Other of string
+  ] <json open_enum>
+
+(* RFC3339 full-date *)
+type date = string wrap <ocaml module="Swagger_util.Date">
+
+(* RFC3339 date-time *)
+type date_time = string wrap <ocaml module="Swagger_util.DateTime">
+
 type contact =
   { ?name : string option
   ; ?url : string <ocaml valid="Swagger_util.Validate.url"> option
@@ -70,7 +95,7 @@ type items_kind =
 
 type items =
   { kind <json name="type"> : items_kind
-  ; ?format : string option
+  ; ?format : format option
   ; ?items : items option
   ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
   ; ?default : t option
@@ -142,7 +167,7 @@ type parameter =
   ; ~required <ocaml default="false"> : bool
   ; ?schema : schema option
   ; ?kind <json name="type"> : kind option
-  ; ?format : string option
+  ; ?format : format option
   ; ~allow_empty_value <json name="allowEmptyValue"> <ocaml default="false"> : bool
   ; ?items : items option
   ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
@@ -166,7 +191,7 @@ type parameters_definitions = (string * parameter) list <json repr="object">
 type header =
   { ?description : string option
   ; kind <json name="type"> : kind
-  ; ?format : string option
+  ; ?format : format option
   ; ?items : items option
   ; ~collection_format <json name="collectionFormat"> <ocaml default="`Csv"> : collection_format
   ; ?default : t option
