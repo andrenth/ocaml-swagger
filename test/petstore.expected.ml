@@ -433,13 +433,13 @@ end = struct
   module Definitions = struct
     module Api_response = struct
       type t = {
-        message : (string option[@default None]);
-        type_ : (string option[@default None]); [@key "type"]
         code : (int option[@default None]);
+        type_ : (string option[@default None]); [@key "type"]
+        message : (string option[@default None]);
       }
       [@@deriving yojson]
 
-      let make ?message ?type_ ?code () = { message; type_; code }
+      let make ?message ?type_ ?code () = { code; type_; message }
       let code t = t.code
       let set_code code t = { t with code }
       let type_ t = t.type_
@@ -454,12 +454,12 @@ end = struct
 
     module Category = struct
       type t = {
-        name : (string option[@default None]);
         id : (int option[@default None]);
+        name : (string option[@default None]);
       }
       [@@deriving yojson]
 
-      let make ?name ?id () = { name; id }
+      let make ?name ?id () = { id; name }
       let id t = t.id
       let set_id id t = { t with id }
       let name t = t.name
@@ -472,17 +472,17 @@ end = struct
 
     module Order = struct
       type t = {
-        complete : (bool option[@default None]);
-        status : (string option[@default None]);
-        ship_date : (string option[@default None]); [@key "shipDate"]
-        quantity : (int option[@default None]);
-        pet_id : (int option[@default None]); [@key "petId"]
         id : (int option[@default None]);
+        pet_id : (int option[@default None]); [@key "petId"]
+        quantity : (int option[@default None]);
+        ship_date : (string option[@default None]); [@key "shipDate"]
+        status : (string option[@default None]);
+        complete : (bool option[@default None]);
       }
       [@@deriving yojson]
 
       let make ?complete ?status ?ship_date ?quantity ?pet_id ?id () =
-        { complete; status; ship_date; quantity; pet_id; id }
+        { id; pet_id; quantity; ship_date; status; complete }
 
       let id t = t.id
       let set_id id t = { t with id }
@@ -504,18 +504,18 @@ end = struct
 
     module Pet = struct
       type t = {
-        status : (string option[@default None]);
-        tags : (Swagger_petstore.Definitions.Tag.t list option[@default None]);
-        photo_urls : string list; [@key "photoUrls"]
-        name : string;
+        id : (int option[@default None]);
         category :
           (Swagger_petstore.Definitions.Category.t option[@default None]);
-        id : (int option[@default None]);
+        name : string;
+        photo_urls : string list; [@key "photoUrls"]
+        tags : (Swagger_petstore.Definitions.Tag.t list option[@default None]);
+        status : (string option[@default None]);
       }
       [@@deriving yojson]
 
       let make ?status ?tags ~photo_urls ~name ?category ?id () =
-        { status; tags; photo_urls; name; category; id }
+        { id; category; name; photo_urls; tags; status }
 
       let id t = t.id
       let set_id id t = { t with id }
@@ -537,12 +537,12 @@ end = struct
 
     module Tag = struct
       type t = {
-        name : (string option[@default None]);
         id : (int option[@default None]);
+        name : (string option[@default None]);
       }
       [@@deriving yojson]
 
-      let make ?name ?id () = { name; id }
+      let make ?name ?id () = { id; name }
       let id t = t.id
       let set_id id t = { t with id }
       let name t = t.name
@@ -555,28 +555,28 @@ end = struct
 
     module User = struct
       type t = {
-        user_status : (int option[@default None]); [@key "userStatus"]
-        phone : (string option[@default None]);
-        password : (string option[@default None]);
-        email : (string option[@default None]);
-        last_name : (string option[@default None]); [@key "lastName"]
-        first_name : (string option[@default None]); [@key "firstName"]
-        username : (string option[@default None]);
         id : (int option[@default None]);
+        username : (string option[@default None]);
+        first_name : (string option[@default None]); [@key "firstName"]
+        last_name : (string option[@default None]); [@key "lastName"]
+        email : (string option[@default None]);
+        password : (string option[@default None]);
+        phone : (string option[@default None]);
+        user_status : (int option[@default None]); [@key "userStatus"]
       }
       [@@deriving yojson]
 
       let make ?user_status ?phone ?password ?email ?last_name ?first_name
           ?username ?id () =
         {
-          user_status;
-          phone;
-          password;
-          email;
-          last_name;
-          first_name;
-          username;
           id;
+          username;
+          first_name;
+          last_name;
+          email;
+          password;
+          phone;
+          user_status;
         }
 
       let id t = t.id
