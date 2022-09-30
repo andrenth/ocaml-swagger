@@ -165,7 +165,9 @@ let definition_module ?(path = []) ~root ~reference_base ~name
         (Codegen_schema.create ~reference_base ~reference_root:root schema)
     in
     let int_or_string =
-      match schema.format with Some "int-or-string" -> true | _ -> false
+      match schema.format with
+      | Some (`Other "int-or-string") -> true (* XXX: Kubernetes only? *)
+      | _ -> false
     in
     let typ =
       Type.create (Type.Sig.abstract "t")
@@ -421,6 +423,14 @@ let object_module =
 
       module Of_ints = Make (struct
         type value = int [@@deriving yojson]
+      end)
+
+      module Of_ints32 = Make (struct
+        type value = int32 [@@deriving yojson]
+      end)
+
+      module Of_ints64 = Make (struct
+        type value = int64 [@@deriving yojson]
       end)
 
       module Of_bools = Make (struct

@@ -11,21 +11,16 @@ module Validate = struct
     len > min && len < max
 end
 
-module Date  = struct
+module Date = struct
   type t = float
 
   let wrap str = ISO8601.Permissive.date str
-
-
   let unwrap = ISO8601.Permissive.string_of_date
 end
 
 module DateTime = struct
   type t = float
 
-  let wrap str =
-     ISO8601.Permissive.datetime str
-
-  let unwrap date =
-    ISO8601.Permissive.string_of_datetimezone(date, 0.)
+  let wrap str = ISO8601.Permissive.datetime str
+  let unwrap date = ISO8601.Permissive.string_of_datetimezone (date, 0.)
 end

@@ -41,6 +41,14 @@ module Object = struct
     type value = int [@@deriving yojson]
   end)
 
+  module Of_ints32 = Make (struct
+    type value = int32 [@@deriving yojson]
+  end)
+
+  module Of_ints64 = Make (struct
+    type value = int64 [@@deriving yojson]
+  end)
+
   module Of_bools = Make (struct
     type value = bool [@@deriving yojson]
   end)
