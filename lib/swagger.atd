@@ -129,7 +129,7 @@ type schema_kind =
 
 type schema =
   { ?reference <json name="$ref"> : reference option
-  ; ?format : string option
+  ; ?format : format option
   ; ?title : string option
   ; ?description : string option
   ; ?default : t option

@@ -41,6 +41,14 @@ module Object = struct
     type value = int [@@deriving yojson]
   end)
 
+  module Of_ints32 = Make (struct
+    type value = int32 [@@deriving yojson]
+  end)
+
+  module Of_ints64 = Make (struct
+    type value = int64 [@@deriving yojson]
+  end)
+
   module Of_bools = Make (struct
     type value = bool [@@deriving yojson]
   end)
@@ -51,10 +59,10 @@ module rec Swagger_petstore : sig
     module Api_response : sig
       type t [@@deriving yojson]
 
-      val make : ?message:string -> ?type_:string -> ?code:int -> unit -> t
-      val code : t -> int option
+      val make : ?message:string -> ?type_:string -> ?code:int32 -> unit -> t
+      val code : t -> int32 option
 
-      val set_code : int option -> t -> t
+      val set_code : int32 option -> t -> t
         [@@ocaml.doc
           {ocamlswagger|Set the value of the code field.|ocamlswagger}]
 
@@ -76,10 +84,10 @@ module rec Swagger_petstore : sig
     module Category : sig
       type t [@@deriving yojson]
 
-      val make : ?name:string -> ?id:int -> unit -> t
-      val id : t -> int option
+      val make : ?name:string -> ?id:int64 -> unit -> t
+      val id : t -> int64 option
 
-      val set_id : int option -> t -> t
+      val set_id : int64 option -> t -> t
         [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val name : t -> string option
@@ -97,33 +105,33 @@ module rec Swagger_petstore : sig
       val make :
         ?complete:bool ->
         ?status:string ->
-        ?ship_date:string ->
-        ?quantity:int ->
-        ?pet_id:int ->
-        ?id:int ->
+        ?ship_date:float ->
+        ?quantity:int32 ->
+        ?pet_id:int64 ->
+        ?id:int64 ->
         unit ->
         t
 
-      val id : t -> int option
+      val id : t -> int64 option
 
-      val set_id : int option -> t -> t
+      val set_id : int64 option -> t -> t
         [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
-      val pet_id : t -> int option
+      val pet_id : t -> int64 option
 
-      val set_pet_id : int option -> t -> t
+      val set_pet_id : int64 option -> t -> t
         [@@ocaml.doc
           {ocamlswagger|Set the value of the pet_id field.|ocamlswagger}]
 
-      val quantity : t -> int option
+      val quantity : t -> int32 option
 
-      val set_quantity : int option -> t -> t
+      val set_quantity : int32 option -> t -> t
         [@@ocaml.doc
           {ocamlswagger|Set the value of the quantity field.|ocamlswagger}]
 
-      val ship_date : t -> string option
+      val ship_date : t -> float option
 
-      val set_ship_date : string option -> t -> t
+      val set_ship_date : float option -> t -> t
         [@@ocaml.doc
           {ocamlswagger|Set the value of the ship_date field.|ocamlswagger}]
 
@@ -152,13 +160,13 @@ module rec Swagger_petstore : sig
         photo_urls:string list ->
         name:string ->
         ?category:Swagger_petstore.Definitions.Category.t ->
-        ?id:int ->
+        ?id:int64 ->
         unit ->
         t
 
-      val id : t -> int option
+      val id : t -> int64 option
 
-      val set_id : int option -> t -> t
+      val set_id : int64 option -> t -> t
         [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val category : t -> Swagger_petstore.Definitions.Category.t option
@@ -199,10 +207,10 @@ module rec Swagger_petstore : sig
     module Tag : sig
       type t [@@deriving yojson]
 
-      val make : ?name:string -> ?id:int -> unit -> t
-      val id : t -> int option
+      val make : ?name:string -> ?id:int64 -> unit -> t
+      val id : t -> int64 option
 
-      val set_id : int option -> t -> t
+      val set_id : int64 option -> t -> t
         [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val name : t -> string option
@@ -218,20 +226,20 @@ module rec Swagger_petstore : sig
       type t [@@deriving yojson]
 
       val make :
-        ?user_status:int ->
+        ?user_status:int32 ->
         ?phone:string ->
         ?password:string ->
         ?email:string ->
         ?last_name:string ->
         ?first_name:string ->
         ?username:string ->
-        ?id:int ->
+        ?id:int64 ->
         unit ->
         t
 
-      val id : t -> int option
+      val id : t -> int64 option
 
-      val set_id : int option -> t -> t
+      val set_id : int64 option -> t -> t
         [@@ocaml.doc {ocamlswagger|Set the value of the id field.|ocamlswagger}]
 
       val username : t -> string option
@@ -270,10 +278,10 @@ module rec Swagger_petstore : sig
         [@@ocaml.doc
           {ocamlswagger|Set the value of the phone field.|ocamlswagger}]
 
-      val user_status : t -> int option
+      val user_status : t -> int32 option
         [@@ocaml.doc {ocamlswagger|User Status|ocamlswagger}]
 
-      val set_user_status : int option -> t -> t
+      val set_user_status : int32 option -> t -> t
         [@@ocaml.doc
           {ocamlswagger|Set the value of the user_status field.|ocamlswagger}]
 
@@ -341,7 +349,7 @@ module rec Swagger_petstore : sig
         ?ctx:Cohttp_lwt_unix.Client.ctx ->
         ?headers:Cohttp.Header.t ->
         Uri.t ->
-        (Object.Of_ints.t, string) result Lwt.t
+        (Object.Of_ints32.t, string) result Lwt.t
         [@@ocaml.doc
           {ocamlswagger|Returns a map of status codes to quantities|ocamlswagger}]
     end
@@ -433,7 +441,7 @@ end = struct
   module Definitions = struct
     module Api_response = struct
       type t = {
-        code : (int option[@default None]);
+        code : (int32 option[@default None]);
         type_ : (string option[@default None]); [@key "type"]
         message : (string option[@default None]);
       }
@@ -462,7 +470,7 @@ end = struct
 
     module Category = struct
       type t = {
-        id : (int option[@default None]);
+        id : (int64 option[@default None]);
         name : (string option[@default None]);
       }
       [@@deriving yojson]
@@ -485,10 +493,10 @@ end = struct
 
     module Order = struct
       type t = {
-        id : (int option[@default None]);
-        pet_id : (int option[@default None]); [@key "petId"]
-        quantity : (int option[@default None]);
-        ship_date : (string option[@default None]); [@key "shipDate"]
+        id : (int64 option[@default None]);
+        pet_id : (int64 option[@default None]); [@key "petId"]
+        quantity : (int32 option[@default None]);
+        ship_date : (float option[@default None]); [@key "shipDate"]
         status : (string option[@default None]);
         complete : (bool option[@default None]);
       }
@@ -534,7 +542,7 @@ end = struct
 
     module Pet = struct
       type t = {
-        id : (int option[@default None]);
+        id : (int64 option[@default None]);
         category :
           (Swagger_petstore.Definitions.Category.t option[@default None]);
         name : string;
@@ -584,7 +592,7 @@ end = struct
 
     module Tag = struct
       type t = {
-        id : (int option[@default None]);
+        id : (int64 option[@default None]);
         name : (string option[@default None]);
       }
       [@@deriving yojson]
@@ -607,14 +615,14 @@ end = struct
 
     module User = struct
       type t = {
-        id : (int option[@default None]);
+        id : (int64 option[@default None]);
         username : (string option[@default None]);
         first_name : (string option[@default None]); [@key "firstName"]
         last_name : (string option[@default None]); [@key "lastName"]
         email : (string option[@default None]);
         password : (string option[@default None]);
         phone : (string option[@default None]);
-        user_status : (int option[@default None]); [@key "userStatus"]
+        user_status : (int32 option[@default None]); [@key "userStatus"]
       }
       [@@deriving yojson]
 
@@ -848,7 +856,7 @@ end = struct
         ignore body;
         Lwt.return
           (if code >= 200 && code < 300 then
-           Ok (Object.Of_ints.t_of_yojson (Yojson.Safe.from_string body))
+           Ok (Object.Of_ints32.t_of_yojson (Yojson.Safe.from_string body))
           else Error (string_of_int code))
     end
 
