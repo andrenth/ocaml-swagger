@@ -24,3 +24,17 @@ module DateTime = struct
   let wrap str = ISO8601.Permissive.datetime str
   let unwrap date = ISO8601.Permissive.string_of_datetimezone (date, 0.)
 end
+
+module Additional_properties_adapter : Atdgen_runtime.Json_adapter.S = struct
+  (** Convert from original json to ATD-compatible json *)
+  let normalize = function
+    | `Bool _b as b -> `Variant ("Boolean", Some b)
+    | `Assoc _schema as schema -> `Variant ("Schema", Some schema)
+    | _ -> assert false
+
+  (** Convert from ATD-compatible json to original json *)
+  let restore = function
+    | `Variant ("boolean", Some b) -> b
+    | `Variant ("schema", Some schema) -> schema
+    | _ -> assert false
+end

@@ -37,11 +37,16 @@ and polymorphism ~reference_base ~reference_root t discriminator =
        discriminator)
 
 and composition ~reference_base ~reference_root t all_of =
+  assert (Mod.name t.reference_root = "Definitions");
   ignore reference_base;
   ignore reference_root;
   ignore t;
   ignore all_of;
-  failwith (sprintf "allOf composition isn't implemented.")
+  Printf.eprintf "t: ref_base: %s ref_root: %s\n%s" t.reference_base
+    (Mod.name t.reference_root)
+    (Swagger_j.string_of_schema t.raw);
+  (* failwith (sprintf "allOf composition isn't implemented.") *)
+  [%type: unit]
 
 and plain_type ~reference_base ~reference_root t kind =
   match kind with
@@ -74,36 +79,51 @@ and plain_type ~reference_base ~reference_root t kind =
       | _ -> failwith "Invalid format for integer data type.")
   | `Boolean -> [%type: bool]
   | `Object -> (
-      match t.raw.additional_properties with
-      | Some props -> (
-          match (props.reference, props.kind) with
-          | Some r, _ ->
-              let t = Mod.reference_module ~reference_base ~reference_root r in
-              Ast_builder.(
-                ptyp_constr (Located.lident (sprintf "%s.Object.t" t)) [])
-          | None, Some `String -> (
-              match t.raw.format with
-              | Some `Byte | Some `Binary | Some `Password | None ->
-                  [%type: Object.Of_strings.t]
-              | Some `Date -> [%type: float]
-              | Some `Date_time -> [%type: float]
-              | Some (`Other format) ->
-                  failwith (sprintf "Unsupported %s string format." format)
-              | _ -> failwith "Invalid format for string data type.")
-          | None, Some `Number -> [%type: Object.Of_floats.t]
-          | None, Some `Integer -> (
-              match props.format with
-              | Some `Int32 -> [%type: Object.Of_ints32.t]
-              | Some `Int64 -> [%type: Object.Of_ints64.t]
-              | None -> [%type: Object.Of_ints.t]
-              | Some (`Other format) ->
-                  failwith (sprintf "Unsupported %s integer format." format)
-              | _ -> failwith "Invalid format for integer data type.")
-          | None, Some `Boolean -> [%type: Object.Of_bools.t]
-          | None, _ ->
-              let t = to_type (create ~reference_base ~reference_root props) in
-              [%type: (string * [%t t]) list])
-      | None -> [%type: unit])
+      let properties _props = failwith "Unsupported properties." in
+      let additional_properties = function
+        | `Boolean b ->
+            failwith (sprintf "Unsupported boolean additionalProperties %b" b)
+        | `Schema (props : Swagger_t.schema) -> (
+            match (props.reference, props.kind) with
+            | Some r, _ ->
+                let t =
+                  Mod.reference_module ~reference_base ~reference_root r
+                in
+                Ast_builder.(
+                  ptyp_constr (Located.lident (sprintf "%s.Object.t" t)) [])
+            | None, Some `String -> (
+                match t.raw.format with
+                | Some `Byte | Some `Binary | Some `Password | None ->
+                    [%type: Object.Of_strings.t]
+                | Some `Date -> [%type: float]
+                | Some `Date_time -> [%type: float]
+                | Some (`Other format) ->
+                    failwith (sprintf "Unsupported %s string format." format)
+                | _ -> failwith "Invalid format for string data type.")
+            | None, Some `Number -> [%type: Object.Of_floats.t]
+            | None, Some `Integer -> (
+                match props.format with
+                | Some `Int32 -> [%type: Object.Of_ints32.t]
+                | Some `Int64 -> [%type: Object.Of_ints64.t]
+                | None -> [%type: Object.Of_ints.t]
+                | Some (`Other format) ->
+                    failwith (sprintf "Unsupported %s integer format." format)
+                | _ -> failwith "Invalid format for integer data type.")
+            | None, Some `Boolean -> [%type: Object.Of_bools.t]
+            | None, _ ->
+                let t =
+                  to_type (create ~reference_base ~reference_root props)
+                in
+                [%type: (string * [%t t]) list])
+      in
+      match (t.raw.properties, t.raw.additional_properties) with
+      | Some props, None -> properties props
+      | None, Some props -> additional_properties props
+      | None, None -> [%type: unit]
+      | _ ->
+          failwith
+            "Specifying properties and additionalProperties is currently \
+             unspecified.")
   | `Array -> (
       match t.raw.items with
       | Some s ->
