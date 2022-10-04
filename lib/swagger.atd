@@ -127,6 +127,11 @@ type schema_kind =
   | Integer <json name="integer">
   ]
 
+type additional_properties =
+  [ Boolean of bool
+  | Schema of schema
+  ] <json adapter.ocaml="Swagger_util.Additional_properties_adapter">
+
 type schema =
   { ?reference <json name="$ref"> : reference option
   ; ?format : format option
@@ -152,7 +157,7 @@ type schema =
   ; ?items : schema option
   ; ?all_of <json name="allOf"> : schema list option
   ; ?properties : (string * schema) list <json repr="object"> option
-  ; ?additional_properties <json name="additionalProperties"> : schema <json repr="object"> option
+  ; ?additional_properties <json name="additionalProperties"> : additional_properties option
   ; ?discriminator : string option
   ; ~read_only <json name="readOnly"> <ocaml default="false"> : bool
   ; ?xml : xml option
