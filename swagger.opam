@@ -2,7 +2,7 @@
 opam-version: "2.0"
 synopsis: "Swagger 2.0 code generator for OCaml"
 description: "Swagger 2.0 code generator for OCaml"
-maintainer: ["Andre Nathan <andre@hostnet.com.br>"]
+maintainer: ["Antonin Décimo <antonin@tarides.com>"]
 authors: [
   "Andre Nathan <andre@hostnet.com.br>"
   "Antonin Décimo <antonin@tarides.com>"
