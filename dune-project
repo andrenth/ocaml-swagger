@@ -7,7 +7,7 @@
 (authors
  "Andre Nathan <andre@hostnet.com.br>"
  "Antonin Décimo <antonin@tarides.com>")
-(maintainers "Andre Nathan <andre@hostnet.com.br>")
+(maintainers "Antonin Décimo <antonin@tarides.com>")
 (license "MIT")
 (package
  (name swagger)
